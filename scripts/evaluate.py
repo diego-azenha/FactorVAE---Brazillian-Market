@@ -2,18 +2,31 @@
 Evaluate FactorVAE on the test set.
 
 Loads the best checkpoint, runs forward_predict on every test date,
-and saves results/predictions/predictions.parquet.
+saves results/predictions/predictions.parquet, then automatically runs:
+  - Robustness test (fractional stock-drop, 5 trials)
+  - Full backtest + comparison table vs benchmark models
+  - Three figures saved to results/figures/
 
 Usage:
     python scripts/evaluate.py
     python scripts/evaluate.py --checkpoint results/checkpoints/best.ckpt
     python scripts/evaluate.py --synthetic
+    python scripts/evaluate.py --skip-backtest
+    python scripts/evaluate.py --skip-robustness
 """
 
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
+
+# Ensure the project root is on sys.path so `scripts.backtest` is importable
+# when this script is invoked as `python scripts/evaluate.py` (Python adds
+# the scripts/ directory itself, not its parent, to sys.path in that case).
+_ROOT_EARLY = Path(__file__).resolve().parents[1]
+if str(_ROOT_EARLY) not in sys.path:
+    sys.path.insert(0, str(_ROOT_EARLY))
 
 import pandas as pd
 import torch
@@ -24,6 +37,7 @@ from factorvae.data.datamodule import FactorVAEDataModule
 from factorvae.models.factorvae import FactorVAE
 from factorvae.training.lightning_module import FactorVAELightning
 from factorvae.evaluation.metrics import compute_rank_ic, compute_rank_icir
+from factorvae.evaluation.robustness import robustness_drop_test
 from factorvae.utils.seeding import seed_everything
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,9 +45,24 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default=str(ROOT / "config.yaml"))
-    parser.add_argument("--checkpoint", default=str(ROOT / "results" / "checkpoints" / "best.ckpt"))
-    parser.add_argument("--synthetic", action="store_true")
+    parser.add_argument("--config",      default=str(ROOT / "config.yaml"))
+    parser.add_argument("--checkpoint",  default=str(ROOT / "results" / "checkpoints" / "best.ckpt"))
+    parser.add_argument("--synthetic",   action="store_true")
+    parser.add_argument(
+        "--benchmark",
+        default=str(ROOT / "data" / "processed" / "benchmark.parquet"),
+        help="Parquet with [date, return] for the index benchmark (falls back to EW market).",
+    )
+    parser.add_argument(
+        "--skip-backtest",
+        action="store_true",
+        help="Skip backtest and comparison table (inference + IC only).",
+    )
+    parser.add_argument(
+        "--skip-robustness",
+        action="store_true",
+        help="Skip the robustness drop test.",
+    )
     args = parser.parse_args()
 
     with open(args.config) as f:
@@ -120,6 +149,32 @@ def main() -> None:
 
     print(f"Test Rank IC:   {sum(rank_ics)/len(rank_ics):.4f}")
     print(f"Test Rank ICIR: {compute_rank_icir(rank_ics):.4f}")
+
+    # ── Robustness test ───────────────────────────────────────────────────────
+    if not args.synthetic and not args.skip_robustness:
+        print("\n── Robustness test (15% stock drop, 5 trials) ──────────────────────")
+        out_df_parsed = out_df.copy()
+        out_df_parsed["date"] = pd.to_datetime(out_df_parsed["date"])
+        rob = robustness_drop_test(out_df_parsed, drop_frac=0.15, n_trials=5)
+        print(f"  Full-universe Rank IC : {rob['rank_ic_full']:+.4f}")
+        print(f"  Drop-{rob['drop_frac']*100:.0f}% mean Rank IC : {rob['rank_ic_mean']:+.4f} "
+              f"± {rob['rank_ic_std']:.4f}  (n_trials={rob['n_trials']})")
+        print(f"  Avg stocks per date   : {rob['avg_n_full']:.1f} full → "
+              f"{rob['avg_n_dropped']:.1f} after drop")
+        print("────────────────────────────────────────────────────────────────────")
+
+    # ── Backtest + comparison ─────────────────────────────────────────────────
+    if not args.synthetic and not args.skip_backtest:
+        print("\n── Running backtest ─────────────────────────────────────────────────")
+        from scripts.backtest import run_backtest_from_predictions
+        out_df_parsed = out_df.copy()
+        out_df_parsed["date"] = pd.to_datetime(out_df_parsed["date"])
+        run_backtest_from_predictions(
+            factorvaepreds=out_df_parsed,
+            config=config,
+            root=ROOT,
+            benchmark_path=Path(args.benchmark),
+        )
 
 
 if __name__ == "__main__":

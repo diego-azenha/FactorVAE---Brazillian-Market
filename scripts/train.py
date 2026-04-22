@@ -54,6 +54,25 @@ def main() -> None:
     model = FactorVAE(config)
     lm = FactorVAELightning(model, config)
 
+    # ── Dataset split summary ─────────────────────────────────────────────────
+    datamodule.setup()
+
+    def _summarize(name: str, ds) -> None:
+        if hasattr(ds, "trading_dates") and len(ds.trading_dates) > 0:
+            first   = ds.trading_dates[0].strftime("%Y-%m-%d")
+            last    = ds.trading_dates[-1].strftime("%Y-%m-%d")
+            n_dates = len(ds.trading_dates)
+            mean_N  = sum(len(v) for v in ds.universe_by_date.values()) / n_dates
+            print(f"  {name:6s}: {n_dates:4d} dates  [{first} → {last}]  mean N_s = {mean_N:.1f}")
+        else:
+            print(f"  {name:6s}: {len(ds):4d} synthetic samples")
+
+    print("\n── Dataset splits ──────────────────────────────────────────────────")
+    _summarize("Train", datamodule._train)
+    _summarize("Val",   datamodule._val)
+    _summarize("Test",  datamodule._test)
+    print("────────────────────────────────────────────────────────────────────\n")
+
     callbacks = [
         EpochProgressCallback(),
         RichProgressBar(),

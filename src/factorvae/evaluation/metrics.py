@@ -60,3 +60,38 @@ def _pearson(a: np.ndarray, b: np.ndarray) -> float:
     if denom < 1e-12:
         return 0.0
     return float((a_dm * b_dm).sum() / denom)
+
+
+def rolling_rank_ic(
+    predictions: "pd.DataFrame",
+    window: int = 60,
+) -> "pd.Series":
+    """
+    Rolling mean of per-date Rank IC over a window of trading days.
+
+    Args:
+        predictions: DataFrame with columns [date, ticker, mu_pred, y_true]
+        window:      rolling window in trading days (60 ≈ 3 months)
+
+    Returns:
+        pd.Series indexed by date with rolling mean Rank IC.
+    """
+    import pandas as pd
+    import torch
+
+    predictions = predictions.copy()
+    predictions["date"] = pd.to_datetime(predictions["date"])
+
+    ics: list[float] = []
+    dates: list = []
+    for date, grp in predictions.groupby("date"):
+        valid = grp.dropna(subset=["y_true", "mu_pred"])
+        if len(valid) < 5:
+            continue
+        y_true = torch.tensor(valid["y_true"].values, dtype=torch.float32)
+        mu     = torch.tensor(valid["mu_pred"].values, dtype=torch.float32)
+        ics.append(compute_rank_ic(y_true, mu))
+        dates.append(date)
+
+    series = pd.Series(ics, index=dates).sort_index()
+    return series.rolling(window, min_periods=window // 2).mean()

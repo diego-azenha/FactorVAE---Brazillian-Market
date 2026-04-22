@@ -16,8 +16,8 @@ model:
   leaky_relu_slope: 0.1
 
 training:
-  batch_size: 1
-  max_epochs: 1
+  batch_size: 16
+  max_epochs: 10
   learning_rate: 1.0e-3
   gamma: 1.0
   seed: 42

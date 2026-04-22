@@ -79,33 +79,58 @@ def topk_drop_strategy(
 def compute_performance_metrics(
     portfolio_returns: pd.Series,
     benchmark_returns: pd.Series,
+    turnover: "pd.Series | None" = None,
 ) -> dict:
     """
-    Compute annualized excess return, Sharpe ratio, and max drawdown
-    of portfolio relative to benchmark.
+    Extended performance metrics.
 
     Args:
-        portfolio_returns: daily portfolio returns (net of fees)
-        benchmark_returns: daily benchmark returns
+        portfolio_returns: daily net returns of the strategy
+        benchmark_returns: daily returns of the reference index
+        turnover:          daily turnover series from topk_drop_strategy (optional)
 
-    Returns:
-        dict with keys: annualized_return, sharpe, max_drawdown
+    Returns dict with:
+        annualized_return  : strategy AR (absolute)
+        annualized_excess  : AR over benchmark
+        volatility         : annualized std of strategy returns
+        sharpe             : SR on excess returns
+        information_ratio  : excess AR / tracking error (identical to sharpe here)
+        max_drawdown       : max peak-to-trough on cumulative excess returns
+        calmar             : annualized_excess / max_drawdown
+        hit_rate           : fraction of days where excess return > 0
+        avg_turnover       : mean daily turnover (only if turnover is provided)
     """
-    excess = portfolio_returns.values - benchmark_returns.reindex(portfolio_returns.index).fillna(0).values
-    trading_days = 252
+    bench = benchmark_returns.reindex(portfolio_returns.index).fillna(0.0).values
+    port  = portfolio_returns.values
+    excess = port - bench
 
-    annualized_return = float(np.mean(excess) * trading_days)
-    annualized_vol = float(np.std(excess, ddof=1) * np.sqrt(trading_days))
-    sharpe = annualized_return / annualized_vol if annualized_vol > 1e-9 else 0.0
+    days = 252
+    ann_return = float(np.mean(port) * days)
+    ann_excess = float(np.mean(excess) * days)
+    vol = float(np.std(port, ddof=1) * np.sqrt(days))
 
-    # Max drawdown on cumulative excess
-    cum = np.cumprod(1 + excess)
-    running_max = np.maximum.accumulate(cum)
-    drawdown = (running_max - cum) / running_max
-    max_drawdown = float(drawdown.max())
+    excess_vol = float(np.std(excess, ddof=1) * np.sqrt(days))
+    sharpe = ann_excess / excess_vol if excess_vol > 1e-9 else 0.0
+    info_ratio = sharpe  # identical under this convention; both reported for clarity
 
-    return {
-        "annualized_return": annualized_return,
-        "sharpe": sharpe,
-        "max_drawdown": max_drawdown,
+    cum_excess  = np.cumprod(1.0 + excess)
+    running_max = np.maximum.accumulate(cum_excess)
+    drawdown    = (running_max - cum_excess) / running_max
+    mdd = float(drawdown.max()) if len(drawdown) > 0 else 0.0
+
+    calmar   = ann_excess / mdd if mdd > 1e-9 else 0.0
+    hit_rate = float(np.mean(excess > 0))
+
+    out = {
+        "annualized_return":  ann_return,
+        "annualized_excess":  ann_excess,
+        "volatility":         vol,
+        "sharpe":             sharpe,
+        "information_ratio":  info_ratio,
+        "max_drawdown":       mdd,
+        "calmar":             calmar,
+        "hit_rate":           hit_rate,
     }
+    if turnover is not None:
+        out["avg_turnover"] = float(turnover.reindex(portfolio_returns.index).mean())
+    return out
