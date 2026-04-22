@@ -18,6 +18,7 @@ from pathlib import Path
 import pandas as pd
 import torch
 import yaml
+from tqdm import tqdm
 
 from factorvae.data.datamodule import FactorVAEDataModule
 from factorvae.models.factorvae import FactorVAE
@@ -40,9 +41,25 @@ def main() -> None:
 
     seed_everything(config["training"]["seed"])
 
+    # Load raw forward returns for ground-truth y_true (NOT z-scored)
+    # RealDataset returns z-scored y which is correct for training/IC, but
+    # backtest needs actual returns in economic units.
+    use_synthetic = args.synthetic
+    if not use_synthetic:
+        returns_path = Path(config["data"]["processed_dir"]) / "returns.parquet"
+        raw_returns: pd.Series = (
+            pd.read_parquet(returns_path)
+            .assign(date=lambda df: pd.to_datetime(df["date"]))
+            .set_index(["date", "ticker"])["forward_return"]
+        )
+    else:
+        raw_returns = None
+
     # Load model
     model = FactorVAE(config)
     lm = FactorVAELightning.load_from_checkpoint(args.checkpoint, model=model, config=config)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    lm.model.to(device)
     lm.model.eval()
 
     # Data
@@ -52,16 +69,16 @@ def main() -> None:
     records = []
     rank_ics = []
 
-    # Resolve real date/ticker labels when using real data
-    use_synthetic = args.synthetic
     test_dataset = datamodule._test
 
     with torch.no_grad():
-        for idx in range(len(test_dataset)):
+        for idx in tqdm(range(len(test_dataset)), desc="Evaluating test set", unit="date"):
             x, y, mask = test_dataset[idx]
-            x = x.float()
-            y = y.float()
+            x = x.float().to(device)
+            y = y.float()   # z-scored — used only for Rank IC (rank-invariant)
             mu_pred, sigma_pred = lm.model.forward_predict(x)
+            mu_pred = mu_pred.cpu()
+            sigma_pred = sigma_pred.cpu()
 
             N = x.shape[0]
 
@@ -74,12 +91,23 @@ def main() -> None:
                 ticker_labels = test_dataset.universe_by_date[date_ts]
 
             for i in range(N):
+                ticker = ticker_labels[i]
+                # y_true: raw forward return in economic units for backtest.
+                # Fall back to NaN if the (date, ticker) key is absent.
+                if raw_returns is not None:
+                    try:
+                        y_true_val = float(raw_returns.loc[(date_ts, ticker)])
+                    except KeyError:
+                        y_true_val = float("nan")
+                else:
+                    y_true_val = y[i].item()
+
                 records.append({
                     "date":       date_label,
-                    "ticker":     ticker_labels[i],
+                    "ticker":     ticker,
                     "mu_pred":    mu_pred[i].item(),
                     "sigma_pred": sigma_pred[i].item(),
-                    "y_true":     y[i].item(),
+                    "y_true":     y_true_val,
                 })
 
             rank_ics.append(compute_rank_ic(y, mu_pred))

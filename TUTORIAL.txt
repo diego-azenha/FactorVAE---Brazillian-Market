@@ -1,0 +1,28 @@
+Config is set. Run these three commands in order:
+
+Step 1 — Train (~1–2 hours on RTX 3060, 1979 dates × 50 epochs):
+
+--> python scripts/train.py
+
+Watch for val_rank_ic increasing each epoch. Early stopping will halt automatically if it stops improving for 10 epochs. At the end you'll see:
+
+# Best val_rank_ic : 0.XXXX
+# Best checkpoint  : results/checkpoints/best.ckpt
+
+
+
+Step 2 — Evaluate (runs on test set 2019–2025, takes ~2 min):
+
+--> python scripts/evaluate.py --checkpoint results/checkpoints/best.ckpt
+
+Outputs:
+
+# Saved 224318 rows to results/predictions/predictions.parquet
+# Test Rank IC:   0.XXXX
+# Test Rank ICIR: 0.XXXX
+
+
+
+Step 3 — Backtest (instantaneous):
+
+python scripts/backtest.py

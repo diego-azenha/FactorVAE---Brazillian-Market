@@ -169,17 +169,31 @@ def compute_features(prices: pd.DataFrame, volume: pd.DataFrame) -> pd.DataFrame
     return features_long
 
 
-def compute_returns(prices: pd.DataFrame) -> pd.DataFrame:
+def compute_returns(
+    prices: pd.DataFrame,
+    min_price: float = 0.10,
+    max_abs_return: float = 0.50,
+) -> pd.DataFrame:
     """
     Compute forward_return = (p_{t+2} - p_{t+1}) / p_{t+1} for each ticker.
     On trading day t: shift(-1) gives p_{t+1}, shift(-2) gives p_{t+2}.
+
+    Filters applied before saving:
+      - Rows where p_{t+1} < min_price are dropped (penny stocks / near-zero
+        prices produce artificially huge returns from unadjusted splits).
+      - Rows where |forward_return| > max_abs_return are dropped (>50% in one
+        day is almost certainly a data artefact, not a real return).
     """
     records = []
     for ticker in prices.columns:
         close = prices[ticker].dropna()
         p_t1 = close.shift(-1)
         p_t2 = close.shift(-2)
-        fwd = (p_t2 - p_t1) / (p_t1.abs() + 1e-9)
+        fwd = (p_t2 - p_t1) / p_t1
+        # Drop penny-stock rows
+        fwd = fwd.where(p_t1 >= min_price)
+        # Drop artefact / unadjusted-split rows
+        fwd = fwd.where(fwd.abs() <= max_abs_return)
         df = pd.DataFrame({"date": close.index, "ticker": ticker, "forward_return": fwd.values})
         df = df.dropna(subset=["forward_return"])
         records.append(df)

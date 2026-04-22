@@ -41,12 +41,6 @@ def main() -> None:
 
     predictions = pd.read_parquet(args.predictions)
 
-    # For synthetic data date_idx is an integer; create a proper date column if needed
-    if "date" not in predictions.columns:
-        predictions["date"] = predictions["date_idx"]
-    if "ticker" not in predictions.columns:
-        predictions["ticker"] = predictions["stock_idx"].astype(str)
-
     # Benchmark: equal-weight of all stocks each day
     benchmark = predictions.groupby("date")["y_true"].mean().rename("benchmark")
 

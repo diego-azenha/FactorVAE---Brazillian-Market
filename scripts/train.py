@@ -12,9 +12,14 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import torch
 import yaml
 import lightning as L
-from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, RichProgressBar, Callback
+
+# Use Tensor Cores on Ampere+ GPUs (RTX 30xx and above) for faster matmul.
+# 'high' trades a tiny amount of float32 precision for significant throughput gain.
+torch.set_float32_matmul_precision("high")
 
 from factorvae.data.datamodule import FactorVAEDataModule
 from factorvae.models.factorvae import FactorVAE
@@ -22,6 +27,15 @@ from factorvae.training.lightning_module import FactorVAELightning
 from factorvae.utils.seeding import seed_everything
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+class EpochProgressCallback(Callback):
+    """Print remaining epochs at the start of each epoch."""
+    def on_epoch_start(self, trainer: L.Trainer, pl_module) -> None:
+        current = trainer.current_epoch
+        total = trainer.max_epochs
+        remaining = total - current - 1
+        print(f"[Epoch {current + 1}/{total}] ({remaining} remaining)")
 
 
 def main() -> None:
@@ -41,6 +55,8 @@ def main() -> None:
     lm = FactorVAELightning(model, config)
 
     callbacks = [
+        EpochProgressCallback(),
+        RichProgressBar(),
         ModelCheckpoint(
             dirpath=str(ROOT / "results" / "checkpoints"),
             filename="best",
@@ -64,7 +80,11 @@ def main() -> None:
     )
 
     trainer.fit(lm, datamodule=datamodule)
-    print(f"Best val_rank_ic: {trainer.callback_metrics.get('val_rank_ic', 'N/A')}")
+    best_score = callbacks[2].best_model_score
+    best_path  = callbacks[2].best_model_path
+    score_str  = f"{best_score.item():.4f}" if best_score is not None else "N/A"
+    print(f"Best val_rank_ic : {score_str}")
+    print(f"Best checkpoint  : {best_path}")
 
 
 if __name__ == "__main__":
