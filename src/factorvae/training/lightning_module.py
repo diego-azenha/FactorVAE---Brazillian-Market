@@ -29,13 +29,20 @@ class FactorVAELightning(L.LightningModule):
 
     # ─── Training ───────────────────────────────────────────
 
-    def training_step(self, batch: tuple[Tensor, Tensor, Tensor], batch_idx: int) -> Tensor:
+    def training_step(self, batch, batch_idx: int) -> Tensor:
         # DataLoader wraps each sample in a batch dim → squeeze it
-        x, y, mask = batch
-        x = x.squeeze(0)   # (N, T, C)
-        y = y.squeeze(0)   # (N,)
+        if len(batch) == 4:
+            x, m, y, mask = batch
+            x = x.squeeze(0)   # (N, T, C)
+            m = m.squeeze(0)   # (macro_dim,)
+            y = y.squeeze(0)   # (N,)
+        else:
+            x, y, mask = batch
+            x = x.squeeze(0)
+            y = y.squeeze(0)
+            m = None
 
-        out = self.model.forward_train(x, y)
+        out = self.model.forward_train(x, y, m=m)
         loss_r = reconstruction_loss(y, out["mu_y_rec"], out["sigma_y_rec"], self.floor)
         loss_k = kl_loss(out["mu_post"], out["sigma_post"], out["mu_prior"], out["sigma_prior"], self.floor)
         loss = loss_r + self.gamma * loss_k
@@ -47,12 +54,19 @@ class FactorVAELightning(L.LightningModule):
 
     # ─── Validation ─────────────────────────────────────────
 
-    def validation_step(self, batch: tuple[Tensor, Tensor, Tensor], batch_idx: int) -> None:
-        x, y, mask = batch
-        x = x.squeeze(0)
-        y = y.squeeze(0)
+    def validation_step(self, batch, batch_idx: int) -> None:
+        if len(batch) == 4:
+            x, m, y, mask = batch
+            x = x.squeeze(0)
+            m = m.squeeze(0)
+            y = y.squeeze(0)
+        else:
+            x, y, mask = batch
+            x = x.squeeze(0)
+            y = y.squeeze(0)
+            m = None
 
-        mu_pred, _ = self.model.forward_predict(x)
+        mu_pred, _ = self.model.forward_predict(x, m=m)
         rank_ic = compute_rank_ic(y, mu_pred)
         self._val_rank_ics.append(rank_ic)
 

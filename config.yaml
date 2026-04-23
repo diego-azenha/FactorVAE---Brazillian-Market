@@ -7,6 +7,7 @@ data:
   test_start: "2019-01-01"
   test_end: "2025-12-31"
   sequence_length: 20
+  use_macro: false      # flag mestre para ablação
 
 model:
   num_features: 20
@@ -14,9 +15,11 @@ model:
   num_factors: 8
   num_portfolios: 64
   leaky_relu_slope: 0.1
+  macro_dim: 0          # preencher com len(macro_cols) quando use_macro=True
 
 training:
-  batch_size: 16
+  # Nota: o DataLoader sempre usa batch_size=1 (uma cross-section por step).
+  # A "batch" efetiva do modelo é N_s (número de tickers na data s), que varia.
   max_epochs: 10
   learning_rate: 1.0e-3
   gamma: 1.0

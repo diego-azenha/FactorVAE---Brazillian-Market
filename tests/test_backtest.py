@@ -136,11 +136,15 @@ def test_topk_drop_portfolio_return_is_finite():
 # ─────────────────────────────────────────────────────────────
 
 def test_performance_metrics_keys():
-    """Output dict must have the three expected keys."""
+    """Output dict must contain all expected metric keys."""
     rets = pd.Series([0.001] * 252)
     bench = pd.Series([0.0] * 252)
     m = compute_performance_metrics(rets, bench)
-    assert set(m.keys()) == {"annualized_return", "sharpe", "max_drawdown"}
+    required = {
+        "annualized_return", "annualized_excess", "volatility",
+        "sharpe", "information_ratio", "max_drawdown", "calmar", "hit_rate",
+    }
+    assert required.issubset(set(m.keys()))
 
 
 def test_performance_metrics_positive_constant_series():

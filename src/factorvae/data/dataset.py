@@ -112,6 +112,8 @@ class RealDataset(Dataset):
         end_date: str,
         sequence_length: int = 20,
         feature_cols: list[str] | None = None,
+        use_macro: bool = False,
+        macro_normalizer: "MacroNormalizer | None" = None,
     ):
         processed_dir = Path(processed_dir)
 
@@ -130,6 +132,35 @@ class RealDataset(Dataset):
         self.feature_cols: list[str] = feature_cols
         self.C: int = len(feature_cols)
         self.T: int = sequence_length
+
+        # ── Macro context (optional) ─────────────────────────────────────
+        self.use_macro = use_macro
+        self._macro_by_date: dict[pd.Timestamp, np.ndarray] | None = None
+        self.macro_dim: int = 0
+
+        if use_macro:
+            macro_path = Path(processed_dir) / "macro.parquet"
+            if not macro_path.exists():
+                raise FileNotFoundError(
+                    f"use_macro=True mas {macro_path} não existe."
+                )
+            if macro_normalizer is None:
+                raise ValueError(
+                    "use_macro=True requer um macro_normalizer (ajustado no treino)."
+                )
+            macro_wide = (
+                pd.read_parquet(macro_path)
+                .assign(date=lambda df: pd.to_datetime(df["date"]))
+                .pivot(index="date", columns="feature_name", values="value")
+                .sort_index()
+                .ffill()
+            )
+            macro_norm = macro_normalizer.transform(macro_wide)
+            self.macro_dim = macro_normalizer.dim
+            self._macro_by_date = {
+                ts: macro_norm.loc[ts].values.astype(np.float32)
+                for ts in macro_norm.index
+            }
 
         # ── Build wide feature dicts: ticker → DataFrame(date → features) ─
         # Index by date for fast O(1) lookups in __getitem__
@@ -227,4 +258,7 @@ class RealDataset(Dataset):
         x    = torch.from_numpy(x_np)
         y    = torch.from_numpy(y_np)
         mask = torch.ones(N, dtype=torch.bool)
+        if self.use_macro:
+            m = torch.from_numpy(self._macro_by_date[date_ts])  # (macro_dim,)
+            return x, m, y, mask
         return x, y, mask

@@ -29,20 +29,22 @@ class FactorVAE(nn.Module):
         K = config["model"]["num_factors"]
         M = config["model"]["num_portfolios"]
         slope = config["model"]["leaky_relu_slope"]
+        macro_dim = config["model"].get("macro_dim", 0)
 
         # Single shared feature extractor — DO NOT instantiate one per module
         self.feature_extractor = FeatureExtractor(C, H, slope)
         self.encoder = FactorEncoder(H, M, K)
-        self.predictor = FactorPredictor(H, K, slope)
+        self.predictor = FactorPredictor(H, K, slope, macro_dim=macro_dim)
         self.decoder = FactorDecoder(H, K, slope)
 
-    def forward_train(self, x: Tensor, y: Tensor) -> dict:
+    def forward_train(self, x: Tensor, y: Tensor, m: Tensor | None = None) -> dict:
         """
         Training forward pass.
 
         Args:
             x: (N, T, C)
             y: (N,)  future returns (oracle signal)
+            m: (macro_dim,) optional macro vector
 
         Returns dict with keys:
             e            : (N, H)
@@ -55,7 +57,7 @@ class FactorVAE(nn.Module):
         """
         e = self.feature_extractor(x)                          # (N, H)
         mu_post, sigma_post = self.encoder(y, e)               # (K,), (K,)
-        mu_prior, sigma_prior = self.predictor(e)              # (K,), (K,)
+        mu_prior, sigma_prior = self.predictor(e, m=m)         # (K,), (K,)
         # Reconstruction uses POSTERIOR — never the prior
         mu_y_rec, sigma_y_rec = self.decoder(mu_post, sigma_post, e)  # (N,), (N,)
         return {
@@ -68,17 +70,18 @@ class FactorVAE(nn.Module):
             "sigma_y_rec": sigma_y_rec,
         }
 
-    def forward_predict(self, x: Tensor) -> tuple[Tensor, Tensor]:
+    def forward_predict(self, x: Tensor, m: Tensor | None = None) -> tuple[Tensor, Tensor]:
         """
         Inference forward pass. Encoder is NOT called.
 
         Args:
             x: (N, T, C)
+            m: (macro_dim,) optional macro vector
 
         Returns:
             mu_pred:    (N,)
             sigma_pred: (N,)
         """
         e = self.feature_extractor(x)
-        mu_prior, sigma_prior = self.predictor(e)
+        mu_prior, sigma_prior = self.predictor(e, m=m)
         return self.decoder(mu_prior, sigma_prior, e)

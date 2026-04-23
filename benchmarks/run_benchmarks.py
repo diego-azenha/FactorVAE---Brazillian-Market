@@ -31,8 +31,10 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Import here so the module-level ROOT in each benchmark resolves correctly
-    from benchmarks.momentum    import generate_predictions as momentum_predict
-    from benchmarks.linear_model import train_and_predict   as linear_predict
+    from benchmarks.momentum     import generate_predictions as momentum_predict
+    from benchmarks.linear_model import train_and_predict    as linear_predict
+    from benchmarks.mlp          import train_and_predict    as mlp_predict
+    from benchmarks.gru          import train_and_predict    as gru_predict
 
     print("─" * 60)
     print("Running Momentum benchmark…")
@@ -47,6 +49,21 @@ def main() -> None:
     out = out_dir / "linear_predictions.parquet"
     lin.to_parquet(out, index=False)
     print(f"  Saved {len(lin):,} rows → {out.relative_to(ROOT)}")
+
+    print()
+    print("Running MLP benchmark…")
+    mlp_df = mlp_predict(config)
+    out = out_dir / "mlp_predictions.parquet"
+    mlp_df.to_parquet(out, index=False)
+    print(f"  Saved {len(mlp_df):,} rows → {out.relative_to(ROOT)}")
+
+    print()
+    print("Running GRU benchmark…")
+    gru_df = gru_predict(config)
+    out = out_dir / "gru_predictions.parquet"
+    gru_df.to_parquet(out, index=False)
+    print(f"  Saved {len(gru_df):,} rows → {out.relative_to(ROOT)}")
+
     print("─" * 60)
     print("Done. Re-run only if processed data or config splits change.")
 

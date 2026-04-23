@@ -33,7 +33,6 @@ def _make_config():
             "leaky_relu_slope": 0.1,
         },
         "training": {
-            "batch_size": 1,
             "max_epochs": 2,
             "learning_rate": 1e-3,
             "gamma": 1.0,
@@ -106,14 +105,13 @@ def test_checkpoint_reload_identical_predictions():
         )
         trainer.fit(lm, datamodule=datamodule)
 
-        # Get a fixed batch
+        # Get a fixed batch — keep on CPU for device-agnostic comparison
         x, y, mask = datamodule._val[0]
-        x = x.unsqueeze(0)
 
-        # Predictions before reload
-        lm.model.eval()
+        # Predictions before reload — move model to CPU for portability
+        lm.model.cpu().eval()
         with torch.no_grad():
-            mu_before, sig_before = lm.model.forward_predict(x.squeeze(0))
+            mu_before, sig_before = lm.model.forward_predict(x)
 
         # Reload from checkpoint
         lm2 = FactorVAELightning.load_from_checkpoint(
@@ -121,9 +119,9 @@ def test_checkpoint_reload_identical_predictions():
             model=FactorVAE(config),
             config=config,
         )
-        lm2.model.eval()
+        lm2.model.cpu().eval()
         with torch.no_grad():
-            mu_after, sig_after = lm2.model.forward_predict(x.squeeze(0))
+            mu_after, sig_after = lm2.model.forward_predict(x)
 
         assert torch.allclose(mu_before, mu_after, atol=1e-5)
         assert torch.allclose(sig_before, sig_after, atol=1e-5)

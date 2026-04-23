@@ -24,7 +24,6 @@ data/processed/
 # Results
 results/checkpoints/
 results/predictions/
-results/figures/
 
 # Jupyter
 .ipynb_checkpoints/

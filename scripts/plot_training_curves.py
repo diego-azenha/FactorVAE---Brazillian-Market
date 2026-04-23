@@ -23,6 +23,11 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from factorvae.evaluation.plot_style import (
+    PALETTE, TEXT_SECONDARY,
+    add_brand_bar, add_footer, add_title, apply_style, finalize_axes,
+)
+
 ROOT = Path(__file__).resolve().parents[1]
 LOGS = ROOT / "lightning_logs"
 
@@ -75,22 +80,26 @@ def main() -> None:
     train = train.set_index("epoch").sort_index()
     val   = val.set_index("epoch").sort_index()
 
+    apply_style()
     fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+    fig.subplots_adjust(top=0.78, bottom=0.10, left=0.07, right=0.93, hspace=0.45, wspace=0.35)
 
     # [0,0] Total training loss
-    axes[0, 0].plot(train.index, train["train_loss"], "o-", markersize=4)
-    axes[0, 0].set_title("Total training loss")
-    axes[0, 0].set_xlabel("Epoch")
+    axes[0, 0].plot(train.index, train["train_loss"], "o-", markersize=4,
+                    color=PALETTE[0])
+    axes[0, 0].set_title("Perda total")
+    axes[0, 0].set_xlabel("Época")
     axes[0, 0].set_ylabel("Loss")
+    finalize_axes(axes[0, 0], y_right=False)
 
     # [0,1] Reconstruction loss with marginal reference
     if "train_loss_recon" in train.columns:
         axes[0, 1].plot(
-            train.index, train["train_loss_recon"], "o-", markersize=4, color="tab:blue"
+            train.index, train["train_loss_recon"], "o-", markersize=4, color=PALETTE[1]
         )
         axes[0, 1].axhline(
             _NLL_FLOOR,
-            color="grey",
+            color=TEXT_SECONDARY,
             linestyle="--",
             linewidth=0.8,
             label=f"N(0,1) marginal ({_NLL_FLOOR:.3f})",
@@ -99,37 +108,43 @@ def main() -> None:
     else:
         axes[0, 1].text(0.5, 0.5, "train_loss_recon\nnot logged",
                         ha="center", va="center", transform=axes[0, 1].transAxes)
-    axes[0, 1].set_title("Reconstruction loss (NLL)")
-    axes[0, 1].set_xlabel("Epoch")
+    axes[0, 1].set_title("Reconstrução (NLL)")
+    axes[0, 1].set_xlabel("Época")
     axes[0, 1].set_ylabel("Loss")
+    finalize_axes(axes[0, 1], y_right=False)
 
     # [1,0] KL divergence
     if "train_loss_kl" in train.columns:
         axes[1, 0].plot(
-            train.index, train["train_loss_kl"], "o-", markersize=4, color="tab:orange"
+            train.index, train["train_loss_kl"], "o-", markersize=4, color=PALETTE[2]
         )
     else:
         axes[1, 0].text(0.5, 0.5, "train_loss_kl\nnot logged",
                         ha="center", va="center", transform=axes[1, 0].transAxes)
-    axes[1, 0].set_title("KL divergence loss")
-    axes[1, 0].set_xlabel("Epoch")
+    axes[1, 0].set_title("Divergência KL")
+    axes[1, 0].set_xlabel("Época")
     axes[1, 0].set_ylabel("Loss")
+    finalize_axes(axes[1, 0], y_right=False)
 
     # [1,1] Validation Rank IC
     axes[1, 1].plot(
-        val.index, val["val_rank_ic"], "o-", markersize=4, color="tab:green"
+        val.index, val["val_rank_ic"], "o-", markersize=4, color=PALETTE[3]
     )
-    axes[1, 1].axhline(0, color="grey", linestyle="--", linewidth=0.5)
-    axes[1, 1].set_title("Validation Rank IC")
-    axes[1, 1].set_xlabel("Epoch")
+    axes[1, 1].axhline(0, color=TEXT_SECONDARY, linestyle="--", linewidth=0.5)
+    axes[1, 1].set_title("Rank IC (validação)")
+    axes[1, 1].set_xlabel("Época")
     axes[1, 1].set_ylabel("Rank IC")
+    finalize_axes(axes[1, 1], y_right=False)
 
-    fig.suptitle(f"Training diagnostics — {version_dir.name}", fontsize=12)
-    fig.tight_layout()
+    add_brand_bar(fig)
+    add_title(fig, "Diagnóstico de treino",
+              subtitle="Perda total, componente de reconstrução e KL, Rank IC de validação",
+              y_title=0.945, y_sub=0.895)
+    add_footer(fig, source="Lightning logs. Cálculos do autor")
 
     out = ROOT / "results" / "figures" / "training_curves.png"
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, dpi=150, bbox_inches="tight")
+    fig.savefig(out)
     plt.close(fig)
     print(f"Saved → {out.relative_to(ROOT)}")
 

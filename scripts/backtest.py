@@ -26,21 +26,35 @@ import yaml
 from factorvae.evaluation.backtest  import compute_performance_metrics, topk_drop_strategy
 from factorvae.evaluation.comparison import (
     build_comparison_table,
+    format_for_display,
     load_all_predictions,
     load_benchmark,
     print_comparison,
 )
 from factorvae.evaluation.metrics import rolling_rank_ic
+from factorvae.evaluation.plot_style import (
+    PALETTE, TEXT_SECONDARY,
+    add_brand_bar, add_footer, add_title, apply_style, finalize_axes, label_lines,
+)
+from factorvae.evaluation.plot_table import render_comparison_table
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 # ── Figure helpers ────────────────────────────────────────────────────────────
 
-def _apply_date_fmt(ax: "plt.Axes", fig: "plt.Figure") -> None:
+def _date_axis(ax: plt.Axes) -> None:
     ax.xaxis.set_major_locator(mdates.AutoDateLocator())
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
-    fig.autofmt_xdate()
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
+
+
+COLOR_MAP = {
+    "FactorVAE":      PALETTE[0],      # brand red
+    "Momentum":       "#003f88",       # deep navy
+    "Linear (Ridge)": "#1a6eb5",       # medium blue
+    "MLP":            "#5b9fd4",       # light blue
+    "GRU":            "#9ec5e8",       # pale blue
+}
 
 
 # ── Core backtest logic (importable by evaluate.py) ───────────────────────────
@@ -60,6 +74,8 @@ def run_backtest_from_predictions(
         root:           workspace root for locating benchmark parquets + output dirs.
         benchmark_path: path to benchmark return parquet; falls back to EW market.
     """
+    apply_style()
+
     k   = config["evaluation"]["top_k"]
     n   = config["evaluation"]["drop_n"]
     eta = config["evaluation"]["risk_aversion_eta"]
@@ -87,6 +103,72 @@ def run_backtest_from_predictions(
     print_comparison(table)
     print(f"\nTable saved → {csv_path.relative_to(root)}")
 
+    # ── Render three styled comparison table PNGs ─────────────────────────────
+    # Add EW Market row to performance table (buy-and-hold baseline)
+    _ew_turn  = pd.Series(0.0, index=benchmark.index)
+    _ew_perf  = compute_performance_metrics(benchmark, benchmark, turnover=_ew_turn)
+    _ew_row   = pd.DataFrame(
+        {**{"rank_ic": float("nan"), "rank_icir": float("nan")}, **_ew_perf},
+        index=["EW Market"],
+    )
+    _fv_pos   = (list(table.index).index("FactorVAE") + 1
+                 if "FactorVAE" in table.index else len(table))
+    perf_table = pd.concat([table.iloc[:_fv_pos], _ew_row, table.iloc[_fv_pos:]])
+
+    formatted      = format_for_display(table)
+    formatted_perf = format_for_display(perf_table)
+
+    _PRETTY = {
+        "rank_ic":            "Rank IC",
+        "rank_icir":          "Rank ICIR",
+        "annualized_return":  "Ret. Anual",
+        "annualized_excess":  "Retorno Exc.",
+        "volatility":         "Volatil.",
+        "sharpe":             "Sharpe",
+        "information_ratio":  "IR",
+        "calmar":             "Calmar",
+        "max_drawdown":       "Max DD",
+        "hit_rate":           "Hit Rate",
+        "avg_turnover":       "Turnover",
+    }
+
+    def _sub(cols: list[str], fmt: "pd.DataFrame | None" = None) -> "pd.DataFrame":
+        src     = fmt if fmt is not None else formatted
+        present = [c for c in cols if c in src.columns]
+        return src[present].rename(columns=_PRETTY)
+
+    _IC    = ["rank_ic", "rank_icir"]
+    _PERF  = ["annualized_return", "annualized_excess", "volatility",
+               "sharpe", "information_ratio", "calmar", "max_drawdown"]
+    _STRAT = ["hit_rate", "avg_turnover"]
+
+    render_comparison_table(
+        _sub(_IC),
+        out_path=fig_dir / "comparison_ic.png",
+        title="Qualidade do sinal preditivo",
+        subtitle="Rank IC e Rank ICIR médios · período de teste",
+        figsize=(7, 3.5),
+    )
+    print("Figure saved → results/figures/comparison_ic.png")
+
+    render_comparison_table(
+        _sub(_PERF, formatted_perf),
+        out_path=fig_dir / "comparison_performance.png",
+        title="Performance ajustada ao risco — TopK-Drop",
+        subtitle=f"k={k} ações, n={n}/dia, taxa 10 bps · período de teste",
+        figsize=(11, 5.0),
+    )
+    print("Figure saved → results/figures/comparison_performance.png")
+
+    render_comparison_table(
+        _sub(_STRAT),
+        out_path=fig_dir / "comparison_strategy.png",
+        title="Métricas da estratégia TopK-Drop",
+        subtitle="Hit rate e turnover médio · período de teste",
+        figsize=(7, 3.5),
+    )
+    print("Figure saved → results/figures/comparison_strategy.png")
+
     # ── Warn if FactorVAE is dominated on Rank IC ─────────────────────────────
     if "rank_ic" in table.columns and "FactorVAE" in table.index:
         fv_ic = table.loc["FactorVAE", "rank_ic"]
@@ -108,50 +190,86 @@ def run_backtest_from_predictions(
         port = topk_drop_strategy(preds, k=k, n=n, eta=0.0).set_index("date")
         port_series[name] = port["portfolio_return"]
 
-    # ── Figure 1: Cumulative absolute return ──────────────────────────────────
-    fig1, ax1 = plt.subplots(figsize=(13, 5))
-    for name, ret in port_series.items():
-        cum = (1.0 + ret).cumprod()
-        ax1.plot(cum.index, cum.values, label=name)
     all_dates = sorted({d for r in port_series.values() for d in r.index})
     bm_aligned = benchmark.reindex(all_dates).fillna(0.0)
-    cum_bm = (1.0 + bm_aligned).cumprod()
     label_bm = benchmark.name if hasattr(benchmark, "name") and benchmark.name else "Benchmark"
-    ax1.plot(cum_bm.index, cum_bm.values, linestyle="--", color="grey", label=label_bm)
-    ax1.set_title("Cumulative Return (TopK-Drop, net of fees)")
-    ax1.set_ylabel("Cumulative return (1 = start)")
-    ax1.legend()
-    _apply_date_fmt(ax1, fig1)
-    fig1.savefig(fig_dir / "cumulative_return.png", dpi=150, bbox_inches="tight")
+
+    # ── Figure 1: Retorno acumulado ───────────────────────────────────────────
+    fig1, ax1 = plt.subplots(figsize=(11, 5.5))
+    fig1.subplots_adjust(top=0.80, bottom=0.14, left=0.06, right=0.90)
+
+    cum_series: dict[str, pd.Series] = {}
+    for name, ret in port_series.items():
+        color = COLOR_MAP.get(name, PALETTE[-1])
+        cum = (1.0 + ret).cumprod()
+        ax1.plot(cum.index, cum.values, color=color)
+        cum_series[name] = cum
+
+    cum_bm = (1.0 + bm_aligned).cumprod()
+    ax1.plot(cum_bm.index, cum_bm.values, color=TEXT_SECONDARY, linestyle="-", linewidth=0.7)
+    cum_series[label_bm] = cum_bm
+
+    label_lines(ax1, cum_series, color_map={**COLOR_MAP, label_bm: TEXT_SECONDARY})
+    finalize_axes(ax1, y_right=False)
+    _date_axis(ax1)
+    ax1.set_ylabel("Retorno acumulado (1 = início)")
+
+    add_brand_bar(fig1)
+    add_title(fig1, "Retorno acumulado — estratégia TopK-Drop",
+              subtitle=f"k={k} ações, turnover máx. n={n}/dia, taxa 10 bps · universo B3")
+    add_footer(fig1, source="Economatica. Cálculos do autor")
+    fig1.savefig(fig_dir / "cumulative_return.png")
     plt.close(fig1)
     print("Figure saved → results/figures/cumulative_return.png")
 
-    # ── Figure 2: Cumulative excess return (%) ────────────────────────────────
-    fig2, ax2 = plt.subplots(figsize=(13, 5))
+    # ── Figure 2: Retorno acumulado em excesso ────────────────────────────────
+    fig2, ax2 = plt.subplots(figsize=(11, 5.5))
+    fig2.subplots_adjust(top=0.80, bottom=0.14, left=0.06, right=0.90)
+
+    excess_series: dict[str, pd.Series] = {}
     for name, ret in port_series.items():
+        color = COLOR_MAP.get(name, PALETTE[-1])
         excess = ret - benchmark.reindex(ret.index).fillna(0.0)
         cum_ex = (1.0 + excess).cumprod() - 1.0
-        ax2.plot(cum_ex.index, cum_ex.values * 100.0, label=name)
-    ax2.axhline(0, color="grey", linewidth=0.6, linestyle="--")
-    ax2.set_title("Cumulative Excess Return vs Benchmark (TopK-Drop)")
-    ax2.set_ylabel("Cumulative excess return (%)")
-    ax2.legend()
-    _apply_date_fmt(ax2, fig2)
-    fig2.savefig(fig_dir / "cumulative_excess_return.png", dpi=150, bbox_inches="tight")
+        ax2.plot(cum_ex.index, cum_ex.values * 100.0, color=color)
+        excess_series[name] = cum_ex * 100.0
+
+    ax2.axhline(0, color=TEXT_SECONDARY, linewidth=0.6, linestyle="--")
+    label_lines(ax2, excess_series, color_map=COLOR_MAP)
+    finalize_axes(ax2)
+    _date_axis(ax2)
+    ax2.set_ylabel("Retorno acumulado em excesso (%)")
+
+    add_brand_bar(fig2)
+    add_title(fig2, "Retorno acumulado em excesso vs benchmark",
+              subtitle=f"TopK-Drop k={k}, n={n} · universo B3")
+    add_footer(fig2, source="Economatica. Cálculos do autor")
+    fig2.savefig(fig_dir / "cumulative_excess_return.png")
     plt.close(fig2)
     print("Figure saved → results/figures/cumulative_excess_return.png")
 
     # ── Figure 3: Rolling 60-day Rank IC ──────────────────────────────────────
-    fig3, ax3 = plt.subplots(figsize=(13, 4))
+    fig3, ax3 = plt.subplots(figsize=(11, 4.5))
+    fig3.subplots_adjust(top=0.80, bottom=0.14, left=0.06, right=0.90)
+
+    ic_series: dict[str, pd.Series] = {}
     for name, preds in all_preds.items():
+        color = COLOR_MAP.get(name, PALETTE[-1])
         r = rolling_rank_ic(preds, window=60)
-        ax3.plot(r.index, r.values, label=name)
-    ax3.axhline(0, color="grey", linewidth=0.6, linestyle="--")
-    ax3.set_title("60-day Rolling Rank IC")
-    ax3.set_ylabel("Rank IC (60-day rolling mean)")
-    ax3.legend()
-    _apply_date_fmt(ax3, fig3)
-    fig3.savefig(fig_dir / "rolling_rank_ic.png", dpi=150, bbox_inches="tight")
+        ax3.plot(r.index, r.values, color=color)
+        ic_series[name] = r
+
+    ax3.axhline(0, color=TEXT_SECONDARY, linewidth=0.6, linestyle="--")
+    label_lines(ax3, ic_series, color_map=COLOR_MAP)
+    finalize_axes(ax3)
+    _date_axis(ax3)
+    ax3.set_ylabel("IC de Spearman, média 60 dias")
+
+    add_brand_bar(fig3)
+    add_title(fig3, "IC de Spearman — rolling 60 dias",
+              subtitle="Correlação cross-sectional entre retorno previsto e realizado")
+    add_footer(fig3, source="Economatica. Cálculos do autor")
+    fig3.savefig(fig_dir / "rolling_rank_ic.png")
     plt.close(fig3)
     print("Figure saved → results/figures/rolling_rank_ic.png")
 

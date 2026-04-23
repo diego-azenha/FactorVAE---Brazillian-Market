@@ -156,6 +156,22 @@ def test_no_future_features_in_lookback(small_dataset):
 
 
 @skip_if_no_data
+def test_no_future_features_in_lookback_all(small_dataset):
+    """Verifica TODA a cross-section de TODAS as datas do small_dataset."""
+    for i in range(len(small_dataset)):
+        date_ts = small_dataset.trading_dates[i]
+        tickers = small_dataset.universe_by_date[date_ts]
+        for ticker in tickers:
+            feat_df = small_dataset._features_by_ticker[ticker]
+            loc = feat_df.index.searchsorted(date_ts, side="right")
+            window_dates = feat_df.index[loc - small_dataset.T : loc]
+            assert window_dates[-1] <= date_ts, (
+                f"Feature futura no lookback: {ticker} em {date_ts} "
+                f"tem janela até {window_dates[-1]}"
+            )
+
+
+@skip_if_no_data
 def test_trading_dates_sorted(small_dataset):
     dates = small_dataset.trading_dates
     for i in range(len(dates) - 1):

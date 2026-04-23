@@ -30,6 +30,8 @@ def load_all_predictions(root: Path) -> dict[str, pd.DataFrame]:
         "FactorVAE":      root / "results" / "predictions" / "predictions.parquet",
         "Momentum":       root / "benchmarks" / "predictions" / "momentum_predictions.parquet",
         "Linear (Ridge)": root / "benchmarks" / "predictions" / "linear_predictions.parquet",
+        "MLP":            root / "benchmarks" / "predictions" / "mlp_predictions.parquet",
+        "GRU":            root / "benchmarks" / "predictions" / "gru_predictions.parquet",
     }
     out: dict[str, pd.DataFrame] = {}
     for name, path in sources.items():
@@ -122,9 +124,12 @@ def build_comparison_table(
 
 # ── Formatted printer ─────────────────────────────────────────────────────────
 
-def print_comparison(df: pd.DataFrame) -> None:
+def format_for_display(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Print comparison table with % formatting for return-like columns.
+    Return a copy of *df* with numeric columns formatted as strings.
+
+    % columns:  annualized_return, volatility, etc.  → "+12.34%"
+    float cols: rank_ic, sharpe, etc.                → "+0.123"
     """
     pct_cols = [
         "annualized_return", "annualized_excess", "volatility",
@@ -143,4 +148,9 @@ def print_comparison(df: pd.DataFrame) -> None:
             formatted[c] = formatted[c].map(
                 lambda v: f"{v:+.3f}" if not np.isnan(float(v)) else "N/A"
             )
-    print(formatted.to_string())
+    return formatted
+
+
+def print_comparison(df: pd.DataFrame) -> None:
+    """Print comparison table with % formatting for return-like columns."""
+    print(format_for_display(df).to_string())

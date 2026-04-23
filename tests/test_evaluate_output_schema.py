@@ -50,7 +50,6 @@ def _make_config(ckpt_dir: str) -> dict:
             "leaky_relu_slope": 0.1,
         },
         "training": {
-            "batch_size": 1,
             "max_epochs": 1,
             "learning_rate": 1e-3,
             "gamma": 1.0,
