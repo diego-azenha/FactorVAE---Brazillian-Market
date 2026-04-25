@@ -20,7 +20,7 @@ model:
 training:
   # Nota: o DataLoader sempre usa batch_size=1 (uma cross-section por step).
   # A "batch" efetiva do modelo é N_s (número de tickers na data s), que varia.
-  max_epochs: 10
+  max_epochs: 50
   learning_rate: 1.0e-3
   gamma: 1.0
   seed: 42

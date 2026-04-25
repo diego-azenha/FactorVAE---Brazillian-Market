@@ -144,30 +144,30 @@ def run_backtest_from_predictions(
 
     render_comparison_table(
         _sub(_IC),
-        out_path=fig_dir / "comparison_ic.png",
+        out_path=fig_dir / "RIC_comparison_ic.png",
         title="Qualidade do sinal preditivo",
         subtitle="Rank IC e Rank ICIR médios · período de teste",
         figsize=(7, 3.5),
     )
-    print("Figure saved → results/figures/comparison_ic.png")
+    print("Figure saved → results/figures/RIC_comparison_ic.png")
 
     render_comparison_table(
         _sub(_PERF, formatted_perf),
-        out_path=fig_dir / "comparison_performance.png",
+        out_path=fig_dir / "BKT_comparison_performance.png",
         title="Performance ajustada ao risco — TopK-Drop",
         subtitle=f"k={k} ações, n={n}/dia, taxa 10 bps · período de teste",
         figsize=(11, 5.0),
     )
-    print("Figure saved → results/figures/comparison_performance.png")
+    print("Figure saved → results/figures/BKT_comparison_performance.png")
 
     render_comparison_table(
         _sub(_STRAT),
-        out_path=fig_dir / "comparison_strategy.png",
+        out_path=fig_dir / "BKT_comparison_strategy.png",
         title="Métricas da estratégia TopK-Drop",
         subtitle="Hit rate e turnover médio · período de teste",
         figsize=(7, 3.5),
     )
-    print("Figure saved → results/figures/comparison_strategy.png")
+    print("Figure saved → results/figures/BKT_comparison_strategy.png")
 
     # ── Warn if FactorVAE is dominated on Rank IC ─────────────────────────────
     if "rank_ic" in table.columns and "FactorVAE" in table.index:
@@ -196,7 +196,7 @@ def run_backtest_from_predictions(
 
     # ── Figure 1: Retorno acumulado ───────────────────────────────────────────
     fig1, ax1 = plt.subplots(figsize=(11, 5.5))
-    fig1.subplots_adjust(top=0.80, bottom=0.14, left=0.06, right=0.90)
+    fig1.subplots_adjust(top=0.84, bottom=0.12, left=0.06, right=0.90)
 
     cum_series: dict[str, pd.Series] = {}
     for name, ret in port_series.items():
@@ -218,13 +218,13 @@ def run_backtest_from_predictions(
     add_title(fig1, "Retorno acumulado — estratégia TopK-Drop",
               subtitle=f"k={k} ações, turnover máx. n={n}/dia, taxa 10 bps · universo B3")
     add_footer(fig1, source="Economatica. Cálculos do autor")
-    fig1.savefig(fig_dir / "cumulative_return.png")
+    fig1.savefig(fig_dir / "BKT_cumulative_return.png")
     plt.close(fig1)
-    print("Figure saved → results/figures/cumulative_return.png")
+    print("Figure saved → results/figures/BKT_cumulative_return.png")
 
     # ── Figure 2: Retorno acumulado em excesso ────────────────────────────────
     fig2, ax2 = plt.subplots(figsize=(11, 5.5))
-    fig2.subplots_adjust(top=0.80, bottom=0.14, left=0.06, right=0.90)
+    fig2.subplots_adjust(top=0.84, bottom=0.12, left=0.06, right=0.90)
 
     excess_series: dict[str, pd.Series] = {}
     for name, ret in port_series.items():
@@ -236,7 +236,7 @@ def run_backtest_from_predictions(
 
     ax2.axhline(0, color=TEXT_SECONDARY, linewidth=0.6, linestyle="--")
     label_lines(ax2, excess_series, color_map=COLOR_MAP)
-    finalize_axes(ax2)
+    finalize_axes(ax2, y_right=False)
     _date_axis(ax2)
     ax2.set_ylabel("Retorno acumulado em excesso (%)")
 
@@ -244,13 +244,13 @@ def run_backtest_from_predictions(
     add_title(fig2, "Retorno acumulado em excesso vs benchmark",
               subtitle=f"TopK-Drop k={k}, n={n} · universo B3")
     add_footer(fig2, source="Economatica. Cálculos do autor")
-    fig2.savefig(fig_dir / "cumulative_excess_return.png")
+    fig2.savefig(fig_dir / "BKT_cumulative_excess_return.png")
     plt.close(fig2)
-    print("Figure saved → results/figures/cumulative_excess_return.png")
+    print("Figure saved → results/figures/BKT_cumulative_excess_return.png")
 
     # ── Figure 3: Rolling 60-day Rank IC ──────────────────────────────────────
     fig3, ax3 = plt.subplots(figsize=(11, 4.5))
-    fig3.subplots_adjust(top=0.80, bottom=0.14, left=0.06, right=0.90)
+    fig3.subplots_adjust(top=0.84, bottom=0.12, left=0.06, right=0.90)
 
     ic_series: dict[str, pd.Series] = {}
     for name, preds in all_preds.items():
@@ -261,7 +261,7 @@ def run_backtest_from_predictions(
 
     ax3.axhline(0, color=TEXT_SECONDARY, linewidth=0.6, linestyle="--")
     label_lines(ax3, ic_series, color_map=COLOR_MAP)
-    finalize_axes(ax3)
+    finalize_axes(ax3, y_right=False)
     _date_axis(ax3)
     ax3.set_ylabel("IC de Spearman, média 60 dias")
 
@@ -269,9 +269,9 @@ def run_backtest_from_predictions(
     add_title(fig3, "IC de Spearman — rolling 60 dias",
               subtitle="Correlação cross-sectional entre retorno previsto e realizado")
     add_footer(fig3, source="Economatica. Cálculos do autor")
-    fig3.savefig(fig_dir / "rolling_rank_ic.png")
+    fig3.savefig(fig_dir / "RIC_rolling_rank_ic.png")
     plt.close(fig3)
-    print("Figure saved → results/figures/rolling_rank_ic.png")
+    print("Figure saved → results/figures/RIC_rolling_rank_ic.png")
 
 
 # ── Standalone entry point ────────────────────────────────────────────────────

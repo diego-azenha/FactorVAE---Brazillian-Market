@@ -114,8 +114,11 @@ class RealDataset(Dataset):
         feature_cols: list[str] | None = None,
         use_macro: bool = False,
         macro_normalizer: "MacroNormalizer | None" = None,
+        exclude_tickers: list[str] | None = None,
     ):
         processed_dir = Path(processed_dir)
+        # Tickers to exclude from this dataset (used for holdout-retrain robustness test)
+        _exclude: set[str] = set(exclude_tickers) if exclude_tickers else set()
 
         # ── Load parquets ────────────────────────────────────────────────
         features_long: pd.DataFrame = pd.read_parquet(processed_dir / "features.parquet")
@@ -193,10 +196,10 @@ class RealDataset(Dataset):
             if date_ts < start_ts or date_ts > end_ts:
                 continue
 
-            # Tickers valid on this date
+            # Tickers valid on this date (honouring holdout exclusion)
             tickers = [
                 t for t in self._features_by_ticker
-                if (date_ts, t) in valid_set
+                if (date_ts, t) in valid_set and t not in _exclude
             ]
             if not tickers:
                 continue

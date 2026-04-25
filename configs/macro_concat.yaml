@@ -1,0 +1,46 @@
+# Macro-conditioned configuration: FactorVAE + MacroEncoder (GRU, concatenation).
+# Main contribution of the TCC.
+# Compare against baseline.yaml via Diebold-Mariano test.
+#
+# Macro features (10 total, from macro_processor.py):
+#   - 6 log-return z-scores: USDBRL, VIX, BCOMINTR, BCOMAGTR, MXEF, MOVE
+#   - 2 level z-scores: BZDIOVRA (DI-over), CDS_5Y
+#   - 2 diff z-scores:  BZDIOVRA, CDS_5Y
+#
+# Run: python scripts/train.py --config configs/macro_concat.yaml
+
+data:
+  processed_dir: data/processed
+  train_start: "2010-01-01"
+  train_end: "2017-12-31"
+  val_start: "2018-01-01"
+  val_end: "2018-12-31"
+  test_start: "2019-01-01"
+  test_end: "2025-12-31"
+  sequence_length: 20
+  use_macro: true       # enable macro conditioning
+
+model:
+  num_features: 20
+  hidden_dim: 20
+  num_factors: 8
+  num_portfolios: 64
+  leaky_relu_slope: 0.1
+  macro_dim: 10         # M: 6 logret_z + 2 level_z + 2 diff_z (macro_processor.py)
+  macro_hidden_dim: 16  # GRU hidden size H_macro in MacroEncoder
+  macro_dropout: 0.1
+
+training:
+  max_epochs: 10
+  learning_rate: 1.0e-3
+  macro_lr: 5.0e-4      # reduced LR for MacroEncoder (new component)
+  weight_decay: 1.0e-4
+  gamma: 1.0
+  kl_warmup_steps: 2000
+  seed: 42
+  sigma_floor: 1.0e-6
+
+evaluation:
+  top_k: 50
+  drop_n: 5
+  risk_aversion_eta: 1.0

@@ -41,26 +41,26 @@ PALETTE = [
 def apply_style() -> None:
     """Aplica rcParams globais. Chame uma vez antes de criar figuras."""
     mpl.rcParams.update({
-        "font.family":     "serif",
-        "font.serif":      ["Cambria", "Palatino Linotype", "Book Antiqua", "Georgia", "Times New Roman", "DejaVu Serif"],
-        "font.size":       10,
-        "axes.titlesize":  11,
-        "axes.labelsize":  10,
-        "xtick.labelsize": 9,
-        "ytick.labelsize": 9,
-        "legend.fontsize": 9,
+        "font.family":      "sans-serif",
+        "font.sans-serif":  ["DejaVu Sans", "Helvetica Neue", "Helvetica", "Arial", "Liberation Sans"],
+        "font.size":        10,
+        "axes.titlesize":   11,
+        "axes.labelsize":   10,
+        "xtick.labelsize":  9,
+        "ytick.labelsize":  9,
+        "legend.fontsize":  9,
 
         "text.color":      TEXT_PRIMARY,
-        "axes.labelcolor": TEXT_SECONDARY,
-        "xtick.color":     TEXT_SECONDARY,
-        "ytick.color":     TEXT_SECONDARY,
+        "axes.labelcolor": "#2D2D2D",
+        "xtick.color":     "#2D2D2D",
+        "ytick.color":     "#2D2D2D",
 
         "axes.spines.top":    False,
         "axes.spines.right":  False,
         "axes.spines.left":   False,
         "axes.spines.bottom": True,
-        "axes.edgecolor":     TEXT_SECONDARY,
-        "axes.linewidth":     0.6,
+        "axes.edgecolor":     "#2D2D2D",
+        "axes.linewidth":     0.8,
 
         "axes.grid":       True,
         "axes.grid.axis":  "y",
@@ -148,8 +148,8 @@ def label_lines(ax: plt.Axes, series_map: dict,
         )
 
 
-def finalize_axes(ax: plt.Axes, y_right: bool = True) -> None:
-    """Eixo y à direita (convenção Economist) e ticks discretos."""
+def finalize_axes(ax: plt.Axes, y_right: bool = False) -> None:
+    """Ticks sem comprimento, margem horizontal mínima. y_right move o eixo para a direita."""
     ax.tick_params(axis="both", which="both", length=0)
     ax.margins(x=0.02)
     if y_right:

@@ -82,7 +82,7 @@ def main() -> None:
 
     apply_style()
     fig, axes = plt.subplots(2, 2, figsize=(12, 8))
-    fig.subplots_adjust(top=0.78, bottom=0.10, left=0.07, right=0.93, hspace=0.45, wspace=0.35)
+    fig.subplots_adjust(top=0.83, bottom=0.08, left=0.07, right=0.93, hspace=0.32, wspace=0.28)
 
     # [0,0] Total training loss
     axes[0, 0].plot(train.index, train["train_loss"], "o-", markersize=4,
@@ -142,7 +142,7 @@ def main() -> None:
               y_title=0.945, y_sub=0.895)
     add_footer(fig, source="Lightning logs. Cálculos do autor")
 
-    out = ROOT / "results" / "figures" / "training_curves.png"
+    out = ROOT / "results" / "figures" / "TRAIN_training_curves.png"
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out)
     plt.close(fig)

@@ -1,0 +1,41 @@
+# Baseline configuration: FactorVAE without macro conditioning.
+# Replicates the vanilla FactorVAE on the Brazilian market.
+# Use for ablation comparison against macro_concat.yaml.
+#
+# Run: python scripts/train.py --config configs/baseline.yaml
+
+data:
+  processed_dir: data/processed
+  train_start: "2010-01-01"
+  train_end: "2017-12-31"
+  val_start: "2018-01-01"
+  val_end: "2018-12-31"
+  test_start: "2019-01-01"
+  test_end: "2025-12-31"
+  sequence_length: 20
+  use_macro: false      # no macro conditioning
+
+model:
+  num_features: 20
+  hidden_dim: 20
+  num_factors: 8
+  num_portfolios: 64
+  leaky_relu_slope: 0.1
+  macro_dim: 0          # must be 0 when use_macro: false
+  macro_hidden_dim: 0
+  macro_dropout: 0.1
+
+training:
+  max_epochs: 10
+  learning_rate: 1.0e-3
+  macro_lr: 5.0e-4
+  weight_decay: 1.0e-4
+  gamma: 1.0
+  kl_warmup_steps: 2000
+  seed: 42
+  sigma_floor: 1.0e-6
+
+evaluation:
+  top_k: 50
+  drop_n: 5
+  risk_aversion_eta: 1.0

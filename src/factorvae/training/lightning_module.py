@@ -26,6 +26,11 @@ class FactorVAELightning(L.LightningModule):
         self.floor = config["training"]["sigma_floor"]
         self.save_hyperparameters(config)
         self._val_rank_ics: list[float] = []
+        # Buffers for per-factor distribution snapshot (filled in training_step)
+        self._prior_mu_buf:  list[Tensor] = []
+        self._prior_sig_buf: list[Tensor] = []
+        self._post_mu_buf:   list[Tensor] = []
+        self._post_sig_buf:  list[Tensor] = []
 
     # ─── Training ───────────────────────────────────────────
 
@@ -50,7 +55,36 @@ class FactorVAELightning(L.LightningModule):
         self.log("train_loss_recon", loss_r, on_step=False, on_epoch=True, prog_bar=False)
         self.log("train_loss_kl",    loss_k, on_step=False, on_epoch=True, prog_bar=False)
         self.log("train_loss",       loss,   on_step=False, on_epoch=True, prog_bar=True)
+
+        # Accumulate per-factor distribution params for snapshot visualization
+        self._prior_mu_buf.append(out["mu_prior"].detach().cpu())
+        self._prior_sig_buf.append(out["sigma_prior"].detach().cpu())
+        self._post_mu_buf.append(out["mu_post"].detach().cpu())
+        self._post_sig_buf.append(out["sigma_post"].detach().cpu())
+
         return loss
+
+    def on_train_epoch_end(self) -> None:
+        """Average per-factor distribution params over the epoch and log to CSV."""
+        if not self._prior_mu_buf:
+            return
+        # Stack: (n_batches, K) → mean over batches → (K,)
+        prior_mu  = torch.stack(self._prior_mu_buf).mean(0)   # (K,)
+        prior_sig = torch.stack(self._prior_sig_buf).mean(0)  # (K,)
+        post_mu   = torch.stack(self._post_mu_buf).mean(0)    # (K,)
+        post_sig  = torch.stack(self._post_sig_buf).mean(0)   # (K,)
+
+        K = prior_mu.shape[0]
+        for k in range(K):
+            self.log(f"train_prior_mu_{k}",  prior_mu[k].item(),  on_step=False, on_epoch=True)
+            self.log(f"train_prior_sig_{k}", prior_sig[k].item(), on_step=False, on_epoch=True)
+            self.log(f"train_post_mu_{k}",   post_mu[k].item(),   on_step=False, on_epoch=True)
+            self.log(f"train_post_sig_{k}",  post_sig[k].item(),  on_step=False, on_epoch=True)
+
+        self._prior_mu_buf.clear()
+        self._prior_sig_buf.clear()
+        self._post_mu_buf.clear()
+        self._post_sig_buf.clear()
 
     # ─── Validation ─────────────────────────────────────────
 
