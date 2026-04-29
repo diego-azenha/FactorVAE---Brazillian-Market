@@ -26,7 +26,7 @@ BRAND_RED      = "#C8102E"   # Insper lava-red (serve como "Economist red")
 TEXT_PRIMARY   = "#121212"
 TEXT_SECONDARY = "#6F6F6F"
 GRID_COLOR     = "#E5E5E5"
-BG_COLOR       = "#FBF8F4"   # off-white levemente creme, à la Economist
+BG_COLOR       = "#FFFFFF"   # branco puro
 
 PALETTE = [
     BRAND_RED,    # modelo principal (FactorVAE)
@@ -90,12 +90,14 @@ def add_brand_bar(fig: plt.Figure, x: float = 0.06, y: float = 0.965,
 
 
 def add_title(fig: plt.Figure, title: str, subtitle: str | None = None,
-              x: float = 0.06, y_title: float = 0.905, y_sub: float = 0.855) -> None:
+              x: float = 0.06, y_title: float = 0.905, y_sub: float = 0.855,
+              fontsize_sub: float = 10.5, wrap_sub: bool = False) -> None:
     fig.text(x, y_title, title,
              fontsize=16, fontweight="bold", color=TEXT_PRIMARY, ha="left")
     if subtitle:
         fig.text(x, y_sub, subtitle,
-                 fontsize=10.5, color=TEXT_SECONDARY, ha="left")
+                 fontsize=fontsize_sub, color=TEXT_SECONDARY, ha="left",
+                 wrap=wrap_sub)
 
 
 def add_footer(fig: plt.Figure, source: str,

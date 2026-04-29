@@ -24,17 +24,20 @@ def render_comparison_table(
     figsize: tuple = (11, 4.5),
 ) -> None:
     apply_style()
-    fig, ax = plt.subplots(figsize=figsize)
-    fig.subplots_adjust(top=0.72, bottom=0.12, left=0.04, right=0.96)
+    cols      = list(df.columns)
+    n_data    = len(cols)
+    n_rows    = len(df)
+
+    # Height scales with number of rows to avoid excess whitespace
+    fig_h = max(2.6, 0.9 + n_rows * 0.5)
+    fig, ax = plt.subplots(figsize=(figsize[0], fig_h))
+    fig.subplots_adjust(top=0.72, bottom=0.08, left=0.04, right=0.96)
     ax.axis("off")
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
 
-    cols      = list(df.columns)
-    n_data    = len(cols)
-    n_rows    = len(df)
-    row_h     = 0.62 / (n_rows + 1)  # body occupies 0.62 of axes height
-    y_header  = 0.88
+    y_header  = 0.95
+    row_h     = (y_header - 0.04) / (n_rows + 1)  # fills axes from top to near bottom
 
     # Model column: fixed 0.24; remaining split equally among data cols
     model_x   = 0.01

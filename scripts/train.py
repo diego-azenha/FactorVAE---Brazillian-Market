@@ -86,7 +86,7 @@ def main() -> None:
         EarlyStopping(
             monitor="val_rank_ic",
             mode="max",
-            patience=10,
+            patience=50,
             verbose=True,
         ),
     ]

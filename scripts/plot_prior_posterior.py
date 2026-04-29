@@ -121,7 +121,7 @@ def main() -> None:
 
     cell_h = 2.0
     cell_w = 3.5
-    fig_h  = max(cell_h * K + 1.5, 6.0)
+    fig_h  = max(cell_h * K + 2.8, 6.0)   # extra top margin for title + legend
     fig_w  = cell_w * n_cols + 1.0
 
     fig, axes = plt.subplots(K, n_cols, figsize=(fig_w, fig_h))
@@ -131,11 +131,11 @@ def main() -> None:
         axes = axes[:, np.newaxis]
 
     fig.subplots_adjust(
-        top=1.0 - 1.6 / fig_h,
-        bottom=0.06,
+        top=1.0 - 2.3 / fig_h,
+        bottom=0.05,
         left=0.08,
         right=0.97,
-        hspace=0.55,
+        hspace=0.65,
         wspace=0.35,
     )
 
@@ -170,6 +170,15 @@ def main() -> None:
             ax.set_xlim(x_lo, x_hi)
             ax.set_ylim(bottom=0)
 
+            # Numeric annotations: μ and σ for prior (top-left) and posterior (top-right)
+            ann_kw = dict(fontsize=6.5, va="top", transform=ax.transAxes)
+            ax.text(0.03, 0.97,
+                    f"Prior  μ={mu_prior:+.2f}  σ={sig_prior:.2f}",
+                    color=COLOR_PRIOR, ha="left", **ann_kw)
+            ax.text(0.97, 0.97,
+                    f"Post  μ={mu_post:+.2f}  σ={sig_post:.2f}",
+                    color=COLOR_POSTERIOR, ha="right", **ann_kw)
+
             if col_idx == 0:
                 ax.set_ylabel(f"F{k + 1}", fontsize=8.5, color=TEXT_PRIMARY,
                               rotation=0, labelpad=22, va="center")
@@ -177,27 +186,34 @@ def main() -> None:
                 ax.set_title(f"{stage_labels[col_idx]}\n(época {epoch})",
                              fontsize=9, color=TEXT_PRIMARY, pad=4)
 
-    # Global legend (top-left cell)
+    # Legend placed just below the subtitle, above the subplots
     from matplotlib.lines import Line2D
     legend_handles = [
-        Line2D([0], [0], color=COLOR_PRIOR,     linestyle="--", linewidth=1.4, label="Prior"),
-        Line2D([0], [0], color=COLOR_POSTERIOR, linestyle="-",  linewidth=1.4, label="Posterior"),
+        Line2D([0], [0], color=COLOR_PRIOR,     linestyle="--", linewidth=1.4, label="--- Prior (Preditor φ_pred)"),
+        Line2D([0], [0], color=COLOR_POSTERIOR, linestyle="-",  linewidth=1.4, label="— Posterior (Encoder φ_enc)"),
     ]
     fig.legend(
         handles=legend_handles,
-        loc="upper right",
-        bbox_to_anchor=(0.98, 1.0 - 0.4 / fig_h),
-        fontsize=9,
+        loc="upper left",
+        bbox_to_anchor=(0.06, 1.0 - 1.85 / fig_h),
+        fontsize=8.5,
         frameon=False,
+        ncol=2,
     )
 
-    add_brand_bar(fig, y=1.0 - 0.6 / fig_h)
+    add_brand_bar(fig, y=1.0 - 0.5 / fig_h)
     add_title(
         fig,
         "Prior vs Posterior ao longo do treino",
-        subtitle=f"Distribuições gaussianas por fator latente · {K} fatores",
-        y_title=1.0 - 1.1 / fig_h,
-        y_sub=1.0 - 1.55 / fig_h,
+        subtitle=(
+            f"Cada célula compara a distribuição do Preditor (Prior, tracejado) com a do Encoder (Posterior, sólido) "
+            f"para cada um dos {K} fatores latentes. "
+            "Quanto mais afastadas as curvas, mais o Encoder identificou estrutura além do que o Preditor antecipava."
+        ),
+        y_title=1.0 - 0.9 / fig_h,
+        y_sub=1.0 - 1.45 / fig_h,
+        fontsize_sub=8.5,
+        wrap_sub=True,
     )
     add_footer(fig, source="Lightning logs. Cálculos do autor", y=0.005)
 

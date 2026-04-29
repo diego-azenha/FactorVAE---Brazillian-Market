@@ -12,7 +12,7 @@ data:
 model:
   num_features: 20
   hidden_dim: 20
-  num_factors: 8
+  num_factors: 16
   num_portfolios: 64
   leaky_relu_slope: 0.1
   macro_dim: 0          # preencher com len(macro_cols) quando use_macro=True
@@ -20,8 +20,8 @@ model:
 training:
   # Nota: o DataLoader sempre usa batch_size=1 (uma cross-section por step).
   # A "batch" efetiva do modelo é N_s (número de tickers na data s), que varia.
-  max_epochs: 50
-  learning_rate: 1.0e-3
+  max_epochs: 100
+  learning_rate: 3.0e-4
   gamma: 1.0
   seed: 42
   sigma_floor: 1.0e-6
