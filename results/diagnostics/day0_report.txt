@@ -1,0 +1,680 @@
+=================================================================
+DAY 0 DIAGNOSTIC REPORT
+Run at  : 2026-05-01 11:44:15
+Checkpoint : best-v1.ckpt
+Predictions: predictions.parquet
+=================================================================
+
+-----------------------------------------------------------------
+1. UNIVERSE SURVIVORSHIP & LOOK-AHEAD  [OK]
+-----------------------------------------------------------------
+=================================================================
+UNIVERSE SURVIVORSHIP & LOOK-AHEAD AUDIT
+=================================================================
+
+[1] Raw prices_wide.csv coverage
+  Date range   : 2005-01-03 -> 2026-03-26
+  Total tickers: 205
+  Tickers with last valid price <= train_end (2017-12-31): 42  (should be > 0 if no survivorship bias)
+  Tickers first appearing in test period (>= 2019-01-01): 54  (look-ahead risk if > 0)
+
+  Last valid price year distribution (should have entries every year):
+    2005     2  #
+    2006     4  ##
+    2007     4  ##
+    2008     6  ###
+    2009     5  ##
+    2010     4  ##
+    2011     3  #
+    2012     6  ###
+    2013     2  #
+    2014     1  
+    2015     2  #
+    2017     3  #
+    2018     1  
+    2019     4  ##
+    2020     1  
+    2021     3  #
+    2022     8  ####
+    2023     5  ##
+    2024     5  ##
+    2025     8  ####
+    2026   128  ################################################################
+
+[2] Processed universe.parquet
+  Train       : n_dates=1979  cs_mean=89  cs_min=79  cs_max=100
+  Val (2018)  : n_dates= 245  cs_mean=104  cs_min=100  cs_max=107
+  Test        : n_dates=1743  cs_mean=129  cs_min=104  cs_max=149
+
+[3] Ticker overlap across splits
+  Train-only tickers (delisted before test): 20
+  Test-only  tickers (absent from train):    52
+    Examples: ['AMBP3', 'ARML3', 'ASAI3', 'AUAU3', 'AURA33', 'AURE3', 'BIDI11', 'BLAU3', 'BMOB3', 'BOAS3']
+
+[4] Forward-return construction check
+  [OK] Forward returns match prices[t+1->t+2] formula  (50 checks on 'BBAS3')
+
+[5] Survivorship verdict
+  [OK] 42 tickers delisted before train_end. Survivorship bias appears manageable.
+
+Artifacts saved to: results/diagnostics/
+
+
+-----------------------------------------------------------------
+2. POSTERIOR IC LEAKAGE CHECK (TEST)  [OK]
+-----------------------------------------------------------------
+============================================================
+POSTERIOR IC LEAKAGE CHECK  --  split=TEST
+Checkpoint: best-v1.ckpt
+============================================================
+                    Mean     Std  % Positive
+                                            
+Prior IC (prod)  +0.0237 +0.1848      +54.7%
+Post IC (oracle) +0.1687 +0.1584      +86.1%
+Gap (post-prior) +0.1450 +0.1879      +89.8%
+
+Interpretation:
+  [OK] Posterior IC (+0.1687) > Prior IC (+0.0237) on held-out data
+    Gap = +0.1450. Signal exists; teacher-student gap is real.
+
+Per-date results saved to: results\diagnostics\posterior_ic_test.csv
+
+[STDERR]
+M:\Python Projects\FactorVAE\.venv\Lib\site-packages\torchmetrics\utilities\imports.py:22: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  from pkg_resources import DistributionNotFound, get_distribution
+
+Diagnosing test set:   0%|          | 0/1743 [00:00<?, ?date/s]
+Diagnosing test set:   0%|          | 1/1743 [00:00<09:04,  3.20date/s]
+Diagnosing test set:   0%|          | 4/1743 [00:00<02:39, 10.91date/s]
+Diagnosing test set:   0%|          | 7/1743 [00:00<01:51, 15.56date/s]
+Diagnosing test set:   1%|          | 10/1743 [00:00<01:28, 19.50date/s]
+Diagnosing test set:   1%|          | 13/1743 [00:00<01:17, 22.29date/s]
+Diagnosing test set:   1%|          | 17/1743 [00:00<01:06, 25.77date/s]
+Diagnosing test set:   1%|1         | 21/1743 [00:01<01:00, 28.31date/s]
+Diagnosing test set:   1%|1         | 25/1743 [00:01<00:57, 29.98date/s]
+Diagnosing test set:   2%|1         | 29/1743 [00:01<00:54, 31.62date/s]
+Diagnosing test set:   2%|1         | 33/1743 [00:01<00:53, 32.21date/s]
+Diagnosing test set:   2%|2         | 37/1743 [00:01<00:51, 33.19date/s]
+Diagnosing test set:   2%|2         | 41/1743 [00:01<00:50, 33.46date/s]
+Diagnosing test set:   3%|2         | 45/1743 [00:01<00:50, 33.63date/s]
+Diagnosing test set:   3%|2         | 49/1743 [00:01<00:49, 34.09date/s]
+Diagnosing test set:   3%|3         | 53/1743 [00:01<00:49, 33.90date/s]
+Diagnosing test set:   3%|3         | 57/1743 [00:02<00:49, 34.06date/s]
+Diagnosing test set:   3%|3         | 61/1743 [00:02<00:48, 34.44date/s]
+Diagnosing test set:   4%|3         | 65/1743 [00:02<00:49, 34.16date/s]
+Diagnosing test set:   4%|3         | 69/1743 [00:02<00:49, 33.86date/s]
+Diagnosing test set:   4%|4         | 73/1743 [00:02<00:48, 34.57date/s]
+Diagnosing test set:   4%|4         | 77/1743 [00:02<00:48, 34.27date/s]
+Diagnosing test set:   5%|4         | 81/1743 [00:02<00:48, 34.16date/s]
+Diagnosing test set:   5%|4         | 85/1743 [00:02<00:47, 34.71date/s]
+Diagnosing test set:   5%|5         | 89/1743 [00:02<00:47, 35.02date/s]
+Diagnosing test set:   5%|5         | 93/1743 [00:03<00:46, 35.26date/s]
+Diagnosing test set:   6%|5         | 97/1743 [00:03<00:47, 35.02date/s]
+Diagnosing test set:   6%|5         | 101/1743 [00:03<00:46, 35.20date/s]
+Diagnosing test set:   6%|6         | 105/1743 [00:03<00:46, 35.46date/s]
+Diagnosing test set:   6%|6         | 109/1743 [00:03<00:46, 35.48date/s]
+Diagnosing test set:   6%|6         | 113/1743 [00:03<00:46, 34.85date/s]
+Diagnosing test set:   7%|6         | 117/1743 [00:03<00:47, 34.57date/s]
+Diagnosing test set:   7%|6         | 121/1743 [00:03<00:47, 34.47date/s]
+Diagnosing test set:   7%|7         | 125/1743 [00:04<00:46, 34.68date/s]
+Diagnosing test set:   7%|7         | 129/1743 [00:04<00:46, 34.38date/s]
+Diagnosing test set:   8%|7         | 133/1743 [00:04<00:46, 34.27date/s]
+Diagnosing test set:   8%|7         | 137/1743 [00:04<00:46, 34.58date/s]
+Diagnosing test set:   8%|8         | 141/1743 [00:04<00:46, 34.27date/s]
+Diagnosing test set:   8%|8         | 145/1743 [00:04<00:47, 33.93date/s]
+Diagnosing test set:   9%|8         | 149/1743 [00:04<00:46, 34.03date/s]
+Diagnosing test set:   9%|8         | 153/1743 [00:04<00:46, 34.27date/s]
+Diagnosing test set:   9%|9         | 157/1743 [00:04<00:46, 34.03date/s]
+Diagnosing test set:   9%|9         | 161/1743 [00:05<00:46, 33.78date/s]
+Diagnosing test set:   9%|9         | 165/1743 [00:05<00:46, 33.68date/s]
+Diagnosing test set:  10%|9         | 169/1743 [00:05<00:46, 33.80date/s]
+Diagnosing test set:  10%|9         | 173/1743 [00:05<00:45, 34.30date/s]
+Diagnosing test set:  10%|#         | 177/1743 [00:05<00:45, 34.79date/s]
+Diagnosing test set:  10%|#         | 181/1743 [00:05<00:44, 34.74date/s]
+Diagnosing test set:  11%|#         | 185/1743 [00:05<00:44, 35.09date/s]
+Diagnosing test set:  11%|#         | 189/1743 [00:05<00:45, 34.41date/s]
+Diagnosing test set:  11%|#1        | 193/1743 [00:05<00:45, 34.41date/s]
+Diagnosing test set:  11%|#1        | 197/1743 [00:06<00:44, 34.72date/s]
+Diagnosing test set:  12%|#1        | 201/1743 [00:06<00:45, 34.20date/s]
+Diagnosing test set:  12%|#1        | 205/1743 [00:06<00:45, 33.90date/s]
+Diagnosing test set:  12%|#1        | 209/1743 [00:06<00:45, 33.94date/s]
+Diagnosing test set:  12%|#2        | 213/1743 [00:06<00:45, 33.48date/s]
+Diagnosing test set:  12%|#2        | 217/1743 [00:06<00:46, 32.92date/s]
+Diagnosing test set:  13%|#2        | 221/1743 [00:06<00:46, 32.88date/s]
+Diagnosing test set:  13%|#2        | 225/1743 [00:06<00:45, 33.62date/s]
+Diagnosing test set:  13%|#3        | 229/1743 [00:07<00:44, 33.85date/s]
+Diagnosing test set:  13%|#3        | 233/1743 [00:07<00:44, 34.15date/s]
+Diagnosing test set:  14%|#3        | 237/1743 [00:07<00:43, 34.27date/s]
+Diagnosing test set:  14%|#3        | 241/1743 [00:07<00:44, 34.12date/s]
+Diagnosing test set:  14%|#4        | 245/1743 [00:07<00:43, 34.46date/s]
+Diagnosing test set:  14%|#4        | 249/1743 [00:07<00:43, 34.22date/s]
+Diagnosing test set:  15%|#4        | 253/1743 [00:07<00:43, 34.07date/s]
+Diagnosing test set:  15%|#4        | 257/1743 [00:07<00:43, 33.98date/s]
+Diagnosing test set:  15%|#4        | 261/1743 [00:07<00:43, 34.26date/s]
+Diagnosing test set:  15%|#5        | 265/1743 [00:08<00:43, 34.04date/s]
+Diagnosing test set:  15%|#5        | 269/1743 [00:08<00:44, 33.10date/s]
+Diagnosing test set:  16%|#5        | 273/1743 [00:08<00:45, 32.64date/s]
+Diagnosing test set:  16%|#5        | 277/1743 [00:08<00:44, 33.24date/s]
+Diagnosing test set:  16%|#6        | 281/1743 [00:08<00:43, 33.43date/s]
+Diagnosing test set:  16%|#6        | 285/1743 [00:08<00:43, 33.20date/s]
+Diagnosing test set:  17%|#6        | 289/1743 [00:08<00:43, 33.34date/s]
+Diagnosing test set:  17%|#6        | 293/1743 [00:08<00:43, 33.38date/s]
+Diagnosing test set:  17%|#7        | 297/1743 [00:09<00:43, 33.47date/s]
+Diagnosing test set:  17%|#7        | 301/1743 [00:09<00:42, 33.54date/s]
+Diagnosing test set:  17%|#7        | 305/1743 [00:09<00:42, 33.45date/s]
+Diagnosing test set:  18%|#7        | 309/1743 [00:09<00:43, 33.24date/s]
+Diagnosing test set:  18%|#7        | 313/1743 [00:09<00:42, 33.31date/s]
+Diagnosing test set:  18%|#8        | 317/1743 [00:09<00:43, 32.67date/s]
+Diagnosing test set:  18%|#8        | 321/1743 [00:09<00:42, 33.46date/s]
+Diagnosing test set:  19%|#8        | 325/1743 [00:09<00:43, 32.74date/s]
+Diagnosing test set:  19%|#8        | 329/1743 [00:10<00:43, 32.87date/s]
+Diagnosing test set:  19%|#9        | 333/1743 [00:10<00:42, 32.93date/s]
+Diagnosing test set:  19%|#9        | 337/1743 [00:10<00:42, 33.08date/s]
+Diagnosing test set:  20%|#9        | 341/1743 [00:10<00:43, 32.53date/s]
+Diagnosing test set:  20%|#9        | 345/1743 [00:10<00:42, 32.58date/s]
+Diagnosing test set:  20%|##        | 349/1743 [00:10<00:42, 32.66date/s]
+Diagnosing test set:  20%|##        | 353/1743 [00:10<00:42, 32.89date/s]
+Diagnosing test set:  20%|##        | 357/1743 [00:10<00:41, 33.03date/s]
+Diagnosing test set:  21%|##        | 361/1743 [00:11<00:42, 32.44date/s]
+Diagnosing test set:  21%|##        | 365/1743 [00:11<00:42, 32.60date/s]
+Diagnosing test set:  21%|##1       | 369/1743 [00:11<00:41, 32.82date/s]
+Diagnosing test set:  21%|##1       | 373/1743 [00:11<00:41, 33.08date/s]
+Diagnosing test set:  22%|##1       | 377/1743 [00:11<00:41, 33.14date/s]
+Diagnosing test set:  22%|##1       | 381/1743 [00:11<00:41, 33.15date/s]
+Diagnosing test set:  22%|##2       | 385/1743 [00:11<00:40, 33.32date/s]
+Diagnosing test set:  22%|##2       | 389/1743 [00:11<00:40, 33.22date/s]
+Diagnosing test set:  23%|##2       | 393/1743 [00:11<00:40, 33.15date/s]
+Diagnosing test set:  23%|##2       | 397/1743 [00:12<00:40, 33.37date/s]
+Diagnosing test set:  23%|##3       | 401/1743 [00:12<00:40, 33.35date/s]
+Diagnosing test set:  23%|##3       | 405/1743 [00:12<00:40, 33.22date/s]
+Diagnosing test set:  23%|##3       | 409/1743 [00:12<00:40, 33.31date/s]
+Diagnosing test set:  24%|##3       | 413/1743 [00:12<00:39, 33.29date/s]
+Diagnosing test set:  24%|##3       | 417/1743 [00:12<00:39, 33.36date/s]
+Diagnosing test set:  24%|##4       | 421/1743 [00:12<00:39, 33.51date/s]
+Diagnosing test set:  24%|##4       | 425/1743 [00:12<00:38, 34.05date/s]
+Diagnosing test set:  25%|##4       | 429/1743 [00:13<00:38, 33.82date/s]
+Diagnosing test set:  25%|##4       | 433/1743 [00:13<00:38, 33.82date/s]
+Diagnosing test set:  25%|##5       | 437/1743 [00:13<00:38, 33.61date/s]
+Diagnosing test set:  25%|##5       | 441/1743 [00:13<00:38, 33.59date/s]
+Diagnosing test set:  26%|##5       | 445/1743 [00:13<00:38, 33.44date/s]
+Diagnosing test set:  26%|##5       | 449/1743 [00:13<00:38, 33.54date/s]
+Diagnosing test set:  26%|##5       | 453/1743 [00:13<00:39, 32.76date/s]
+Diagnosing test set:  26%|##6       | 457/1743 [00:13<00:39, 32.68date/s]
+Diagnosing test set:  26%|##6       | 461/1743 [00:14<00:39, 32.82date/s]
+Diagnosing test set:  27%|##6       | 465/1743 [00:14<00:38, 32.96date/s]
+Diagnosing test set:  27%|##6       | 469/1743 [00:14<00:38, 33.28date/s]
+Diagnosing test set:  27%|##7       | 473/1743 [00:14<00:38, 33.11date/s]
+Diagnosing test set:  27%|##7       | 477/1743 [00:14<00:37, 33.42date/s]
+Diagnosing test set:  28%|##7       | 481/1743 [00:14<00:38, 33.15date/s]
+Diagnosing test set:  28%|##7       | 485/1743 [00:14<00:37, 33.19date/s]
+Diagnosing test set:  28%|##8       | 489/1743 [00:14<00:38, 32.76date/s]
+Diagnosing test set:  28%|##8       | 493/1743 [00:15<00:38, 32.85date/s]
+Diagnosing test set:  29%|##8       | 497/1743 [00:15<00:37, 32.86date/s]
+Diagnosing test set:  29%|##8       | 501/1743 [00:15<00:37, 32.89date/s]
+Diagnosing test set:  29%|##8       | 505/1743 [00:15<00:38, 32.49date/s]
+Diagnosing test set:  29%|##9       | 509/1743 [00:15<00:37, 32.64date/s]
+Diagnosing test set:  29%|##9       | 513/1743 [00:15<00:37, 32.76date/s]
+Diagnosing test set:  30%|##9       | 517/1743 [00:15<00:37, 33.09date/s]
+Diagnosing test set:  30%|##9       | 521/1743 [00:15<00:36, 33.09date/s]
+Diagnosing test set:  30%|###       | 525/1743 [00:15<00:36, 33.14date/s]
+Diagnosing test set:  30%|###       | 529/1743 [00:16<00:36, 33.12date/s]
+Diagnosing test set:  31%|###       | 533/1743 [00:16<00:36, 33.18date/s]
+Diagnosing test set:  31%|###       | 537/1743 [00:16<00:36, 32.60date/s]
+Diagnosing test set:  31%|###1      | 541/1743 [00:16<00:37, 31.87date/s]
+Diagnosing test set:  31%|###1      | 545/1743 [00:16<00:37, 32.35date/s]
+Diagnosing test set:  31%|###1      | 549/1743 [00:16<00:36, 32.61date/s]
+Diagnosing test set:  32%|###1      | 553/1743 [00:16<00:36, 32.72date/s]
+Diagnosing test set:  32%|###1      | 557/1743 [00:16<00:35, 32.96date/s]
+Diagnosing test set:  32%|###2      | 561/1743 [00:17<00:35, 33.18date/s]
+Diagnosing test set:  32%|###2      | 565/1743 [00:17<00:35, 33.06date/s]
+Diagnosing test set:  33%|###2      | 569/1743 [00:17<00:37, 31.66date/s]
+Diagnosing test set:  33%|###2      | 573/1743 [00:17<00:37, 31.58date/s]
+Diagnosing test set:  33%|###3      | 577/1743 [00:17<00:37, 31.39date/s]
+Diagnosing test set:  33%|###3      | 581/1743 [00:17<00:37, 30.92date/s]
+Diagnosing test set:  34%|###3      | 585/1743 [00:17<00:37, 31.03date/s]
+Diagnosing test set:  34%|###3      | 589/1743 [00:17<00:36, 31.53date/s]
+Diagnosing test set:  34%|###4      | 593/1743 [00:18<00:36, 31.61date/s]
+Diagnosing test set:  34%|###4      | 597/1743 [00:18<00:36, 31.58date/s]
+Diagnosing test set:  34%|###4      | 601/1743 [00:18<00:35, 32.29date/s]
+Diagnosing test set:  35%|###4      | 605/1743 [00:18<00:34, 32.58date/s]
+Diagnosing test set:  35%|###4      | 609/1743 [00:18<00:35, 32.14date/s]
+Diagnosing test set:  35%|###5      | 613/1743 [00:18<00:34, 32.32date/s]
+Diagnosing test set:  35%|###5      | 617/1743 [00:18<00:35, 32.00date/s]
+Diagnosing test set:  36%|###5      | 621/1743 [00:18<00:35, 31.88date/s]
+Diagnosing test set:  36%|###5      | 625/1743 [00:19<00:35, 31.36date/s]
+Diagnosing test set:  36%|###6      | 629/1743 [00:19<00:35, 31.06date/s]
+Diagnosing test set:  36%|###6      | 633/1743 [00:19<00:35, 31.09date/s]
+Diagnosing test set:  37%|###6      | 637/1743 [00:19<00:35, 31.07date/s]
+Diagnosing test set:  37%|###6      | 641/1743 [00:19<00:36, 30.10date/s]
+Diagnosing test set:  37%|###7      | 645/1743 [00:19<00:36, 30.32date/s]
+Diagnosing test set:  37%|###7      | 649/1743 [00:19<00:36, 29.64date/s]
+Diagnosing test set:  37%|###7      | 653/1743 [00:20<00:36, 29.92date/s]
+Diagnosing test set:  38%|###7      | 657/1743 [00:20<00:35, 30.24date/s]
+Diagnosing test set:  38%|###7      | 661/1743 [00:20<00:35, 30.47date/s]
+Diagnosing test set:  38%|###8      | 665/1743 [00:20<00:35, 30.28date/s]
+Diagnosing test set:  38%|###8      | 669/1743 [00:20<00:35, 30.60date/s]
+Diagnosing test set:  39%|###8      | 673/1743 [00:20<00:35, 30.31date/s]
+Diagnosing test set:  39%|###8      | 677/1743 [00:20<00:35, 30.20date/s]
+Diagnosing test set:  39%|###9      | 681/1743 [00:20<00:35, 29.56date/s]
+Diagnosing test set:  39%|###9      | 684/1743 [00:21<00:35, 29.46date/s]
+Diagnosing test set:  39%|###9      | 687/1743 [00:21<00:35, 29.44date/s]
+Diagnosing test set:  40%|###9      | 691/1743 [00:21<00:35, 29.68date/s]
+Diagnosing test set:  40%|###9      | 695/1743 [00:21<00:34, 30.29date/s]
+Diagnosing test set:  40%|####      | 699/1743 [00:21<00:34, 30.07date/s]
+Diagnosing test set:  40%|####      | 703/1743 [00:21<00:34, 30.25date/s]
+Diagnosing test set:  41%|####      | 707/1743 [00:21<00:35, 29.46date/s]
+Diagnosing test set:  41%|####      | 711/1743 [00:21<00:34, 29.81date/s]
+Diagnosing test set:  41%|####      | 714/1743 [00:22<00:36, 28.41date/s]
+Diagnosing test set:  41%|####1     | 717/1743 [00:22<00:35, 28.51date/s]
+Diagnosing test set:  41%|####1     | 721/1743 [00:22<00:34, 29.22date/s]
+Diagnosing test set:  42%|####1     | 725/1743 [00:22<00:34, 29.17date/s]
+Diagnosing test set:  42%|####1     | 728/1743 [00:22<00:34, 29.35date/s]
+Diagnosing test set:  42%|####1     | 732/1743 [00:22<00:34, 29.66date/s]
+Diagnosing test set:  42%|####2     | 736/1743 [00:22<00:33, 30.04date/s]
+Diagnosing test set:  42%|####2     | 740/1743 [00:22<00:33, 29.51date/s]
+Diagnosing test set:  43%|####2     | 744/1743 [00:23<00:33, 29.76date/s]
+Diagnosing test set:  43%|####2     | 748/1743 [00:23<00:33, 30.07date/s]
+Diagnosing test set:  43%|####3     | 752/1743 [00:23<00:32, 30.14date/s]
+Diagnosing test set:  43%|####3     | 756/1743 [00:23<00:33, 29.24date/s]
+Diagnosing test set:  44%|####3     | 760/1743 [00:23<00:33, 29.18date/s]
+Diagnosing test set:  44%|####3     | 764/1743 [00:23<00:33, 29.55date/s]
+Diagnosing test set:  44%|####4     | 767/1743 [00:23<00:33, 29.32date/s]
+Diagnosing test set:  44%|####4     | 770/1743 [00:23<00:33, 29.38date/s]
+Diagnosing test set:  44%|####4     | 774/1743 [00:24<00:33, 28.97date/s]
+Diagnosing test set:  45%|####4     | 777/1743 [00:24<00:33, 29.21date/s]
+Diagnosing test set:  45%|####4     | 780/1743 [00:24<00:32, 29.26date/s]
+Diagnosing test set:  45%|####4     | 783/1743 [00:24<00:33, 28.97date/s]
+Diagnosing test set:  45%|####5     | 786/1743 [00:24<00:32, 29.05date/s]
+Diagnosing test set:  45%|####5     | 789/1743 [00:24<00:32, 28.99date/s]
+Diagnosing test set:  45%|####5     | 792/1743 [00:24<00:32, 28.94date/s]
+Diagnosing test set:  46%|####5     | 795/1743 [00:24<00:32, 29.02date/s]
+Diagnosing test set:  46%|####5     | 798/1743 [00:24<00:32, 28.87date/s]
+Diagnosing test set:  46%|####5     | 801/1743 [00:25<00:32, 29.06date/s]
+Diagnosing test set:  46%|####6     | 805/1743 [00:25<00:31, 29.39date/s]
+Diagnosing test set:  46%|####6     | 808/1743 [00:25<00:32, 29.15date/s]
+Diagnosing test set:  47%|####6     | 811/1743 [00:25<00:31, 29.29date/s]
+Diagnosing test set:  47%|####6     | 814/1743 [00:25<00:31, 29.09date/s]
+Diagnosing test set:  47%|####6     | 817/1743 [00:25<00:32, 28.92date/s]
+Diagnosing test set:  47%|####7     | 820/1743 [00:25<00:32, 28.04date/s]
+Diagnosing test set:  47%|####7     | 823/1743 [00:25<00:33, 27.82date/s]
+Diagnosing test set:  47%|####7     | 826/1743 [00:25<00:32, 28.12date/s]
+Diagnosing test set:  48%|####7     | 829/1743 [00:26<00:32, 28.55date/s]
+Diagnosing test set:  48%|####7     | 832/1743 [00:26<00:32, 27.80date/s]
+Diagnosing test set:  48%|####7     | 836/1743 [00:26<00:31, 28.83date/s]
+Diagnosing test set:  48%|####8     | 840/1743 [00:26<00:30, 29.54date/s]
+Diagnosing test set:  48%|####8     | 843/1743 [00:26<00:30, 29.58date/s]
+Diagnosing test set:  49%|####8     | 847/1743 [00:26<00:29, 30.05date/s]
+Diagnosing test set:  49%|####8     | 850/1743 [00:26<00:30, 29.43date/s]
+Diagnosing test set:  49%|####8     | 854/1743 [00:26<00:29, 30.37date/s]
+Diagnosing test set:  49%|####9     | 858/1743 [00:26<00:28, 30.62date/s]
+Diagnosing test set:  49%|####9     | 862/1743 [00:27<00:28, 30.39date/s]
+Diagnosing test set:  50%|####9     | 866/1743 [00:27<00:29, 30.06date/s]
+Diagnosing test set:  50%|####9     | 870/1743 [00:27<00:28, 30.21date/s]
+Diagnosing test set:  50%|#####     | 874/1743 [00:27<00:28, 30.04date/s]
+Diagnosing test set:  50%|#####     | 878/1743 [00:27<00:28, 29.97date/s]
+Diagnosing test set:  51%|#####     | 882/1743 [00:27<00:28, 30.56date/s]
+Diagnosing test set:  51%|#####     | 886/1743 [00:27<00:28, 30.46date/s]
+Diagnosing test set:  51%|#####1    | 890/1743 [00:28<00:28, 29.61date/s]
+Diagnosing test set:  51%|#####1    | 893/1743 [00:28<00:28, 29.65date/s]
+Diagnosing test set:  51%|#####1    | 896/1743 [00:28<00:28, 29.31date/s]
+Diagnosing test set:  52%|#####1    | 899/1743 [00:28<00:29, 28.61date/s]
+Diagnosing test set:  52%|#####1    | 902/1743 [00:28<00:29, 28.91date/s]
+Diagnosing test set:  52%|#####1    | 906/1743 [00:28<00:28, 29.46date/s]
+Diagnosing test set:  52%|#####2    | 909/1743 [00:28<00:29, 28.46date/s]
+Diagnosing test set:  52%|#####2    | 912/1743 [00:28<00:29, 28.09date/s]
+Diagnosing test set:  52%|#####2    | 915/1743 [00:28<00:29, 28.26date/s]
+Diagnosing test set:  53%|#####2    | 918/1743 [00:29<00:29, 27.98date/s]
+Diagnosing test set:  53%|#####2    | 922/1743 [00:29<00:28, 28.46date/s]
+Diagnosing test set:  53%|#####3    | 925/1743 [00:29<00:28, 28.86date/s]
+Diagnosing test set:  53%|#####3    | 928/1743 [00:29<00:28, 29.01date/s]
+Diagnosing test set:  53%|#####3    | 932/1743 [00:29<00:27, 29.65date/s]
+Diagnosing test set:  54%|#####3    | 935/1743 [00:29<00:27, 29.70date/s]
+Diagnosing test set:  54%|#####3    | 938/1743 [00:29<00:27, 29.63date/s]
+Diagnosing test set:  54%|#####4    | 942/1743 [00:29<00:26, 30.20date/s]
+Diagnosing test set:  54%|#####4    | 946/1743 [00:29<00:26, 29.64date/s]
+Diagnosing test set:  54%|#####4    | 949/1743 [00:30<00:27, 28.52date/s]
+Diagnosing test set:  55%|#####4    | 952/1743 [00:30<00:27, 28.84date/s]
+Diagnosing test set:  55%|#####4    | 955/1743 [00:30<00:27, 28.85date/s]
+Diagnosing test set:  55%|#####4    | 958/1743 [00:30<00:26, 29.14date/s]
+Diagnosing test set:  55%|#####5    | 961/1743 [00:30<00:26, 29.30date/s]
+Diagnosing test set:  55%|#####5    | 964/1743 [00:30<00:26, 28.88date/s]
+Diagnosing test set:  56%|#####5    | 968/1743 [00:30<00:26, 29.46date/s]
+Diagnosing test set:  56%|#####5    | 972/1743 [00:30<00:25, 29.90date/s]
+Diagnosing test set:  56%|#####5    | 976/1743 [00:31<00:25, 30.11date/s]
+Diagnosing test set:  56%|#####6    | 980/1743 [00:31<00:25, 30.08date/s]
+Diagnosing test set:  56%|#####6    | 984/1743 [00:31<00:25, 30.00date/s]
+Diagnosing test set:  57%|#####6    | 987/1743 [00:31<00:25, 29.95date/s]
+Diagnosing test set:  57%|#####6    | 990/1743 [00:31<00:25, 29.70date/s]
+Diagnosing test set:  57%|#####7    | 994/1743 [00:31<00:25, 29.60date/s]
+Diagnosing test set:  57%|#####7    | 998/1743 [00:31<00:25, 29.69date/s]
+Diagnosing test set:  57%|#####7    | 1001/1743 [00:31<00:25, 29.36date/s]
+Diagnosing test set:  58%|#####7    | 1005/1743 [00:31<00:24, 30.30date/s]
+Diagnosing test set:  58%|#####7    | 1009/1743 [00:32<00:23, 30.60date/s]
+Diagnosing test set:  58%|#####8    | 1013/1743 [00:32<00:23, 30.50date/s]
+Diagnosing test set:  58%|#####8    | 1017/1743 [00:32<00:24, 29.55date/s]
+Diagnosing test set:  59%|#####8    | 1021/1743 [00:32<00:24, 29.65date/s]
+Diagnosing test set:  59%|#####8    | 1024/1743 [00:32<00:24, 29.55date/s]
+Diagnosing test set:  59%|#####8    | 1027/1743 [00:32<00:25, 28.42date/s]
+Diagnosing test set:  59%|#####9    | 1030/1743 [00:32<00:25, 28.37date/s]
+Diagnosing test set:  59%|#####9    | 1033/1743 [00:32<00:24, 28.43date/s]
+Diagnosing test set:  59%|#####9    | 1036/1743 [00:33<00:24, 28.80date/s]
+Diagnosing test set:  60%|#####9    | 1039/1743 [00:33<00:24, 29.08date/s]
+Diagnosing test set:  60%|#####9    | 1042/1743 [00:33<00:24, 28.78date/s]
+Diagnosing test set:  60%|######    | 1046/1743 [00:33<00:23, 29.39date/s]
+Diagnosing test set:  60%|######    | 1050/1743 [00:33<00:23, 29.75date/s]
+Diagnosing test set:  60%|######    | 1053/1743 [00:33<00:23, 29.80date/s]
+Diagnosing test set:  61%|######    | 1057/1743 [00:33<00:23, 29.75date/s]
+Diagnosing test set:  61%|######    | 1060/1743 [00:33<00:22, 29.77date/s]
+Diagnosing test set:  61%|######1   | 1064/1743 [00:33<00:22, 29.76date/s]
+Diagnosing test set:  61%|######1   | 1068/1743 [00:34<00:22, 29.78date/s]
+Diagnosing test set:  62%|######1   | 1072/1743 [00:34<00:22, 29.20date/s]
+Diagnosing test set:  62%|######1   | 1075/1743 [00:34<00:23, 28.66date/s]
+Diagnosing test set:  62%|######1   | 1078/1743 [00:34<00:23, 28.87date/s]
+Diagnosing test set:  62%|######2   | 1081/1743 [00:34<00:22, 29.12date/s]
+Diagnosing test set:  62%|######2   | 1084/1743 [00:34<00:22, 29.26date/s]
+Diagnosing test set:  62%|######2   | 1087/1743 [00:34<00:22, 29.40date/s]
+Diagnosing test set:  63%|######2   | 1090/1743 [00:34<00:22, 28.85date/s]
+Diagnosing test set:  63%|######2   | 1094/1743 [00:35<00:22, 29.26date/s]
+Diagnosing test set:  63%|######2   | 1097/1743 [00:35<00:22, 29.00date/s]
+Diagnosing test set:  63%|######3   | 1101/1743 [00:35<00:21, 29.60date/s]
+Diagnosing test set:  63%|######3   | 1104/1743 [00:35<00:22, 28.97date/s]
+Diagnosing test set:  64%|######3   | 1107/1743 [00:35<00:22, 28.62date/s]
+Diagnosing test set:  64%|######3   | 1110/1743 [00:35<00:22, 28.13date/s]
+Diagnosing test set:  64%|######3   | 1113/1743 [00:35<00:22, 28.18date/s]
+Diagnosing test set:  64%|######4   | 1116/1743 [00:35<00:21, 28.66date/s]
+Diagnosing test set:  64%|######4   | 1120/1743 [00:35<00:20, 29.72date/s]
+Diagnosing test set:  64%|######4   | 1123/1743 [00:36<00:20, 29.69date/s]
+Diagnosing test set:  65%|######4   | 1126/1743 [00:36<00:20, 29.71date/s]
+Diagnosing test set:  65%|######4   | 1130/1743 [00:36<00:20, 29.88date/s]
+Diagnosing test set:  65%|######5   | 1134/1743 [00:36<00:20, 29.99date/s]
+Diagnosing test set:  65%|######5   | 1138/1743 [00:36<00:19, 30.60date/s]
+Diagnosing test set:  66%|######5   | 1142/1743 [00:36<00:19, 30.11date/s]
+Diagnosing test set:  66%|######5   | 1146/1743 [00:36<00:19, 30.19date/s]
+Diagnosing test set:  66%|######5   | 1150/1743 [00:36<00:19, 29.83date/s]
+Diagnosing test set:  66%|######6   | 1153/1743 [00:37<00:19, 29.87date/s]
+Diagnosing test set:  66%|######6   | 1156/1743 [00:37<00:20, 29.13date/s]
+Diagnosing test set:  66%|######6   | 1159/1743 [00:37<00:19, 29.31date/s]
+Diagnosing test set:  67%|######6   | 1163/1743 [00:37<00:19, 29.62date/s]
+Diagnosing test set:  67%|######6   | 1166/1743 [00:37<00:19, 29.51date/s]
+Diagnosing test set:  67%|######7   | 1169/1743 [00:37<00:20, 28.69date/s]
+Diagnosing test set:  67%|######7   | 1172/1743 [00:37<00:19, 28.82date/s]
+Diagnosing test set:  67%|######7   | 1176/1743 [00:37<00:19, 29.07date/s]
+Diagnosing test set:  68%|######7   | 1180/1743 [00:37<00:19, 29.39date/s]
+Diagnosing test set:  68%|######7   | 1184/1743 [00:38<00:18, 29.78date/s]
+Diagnosing test set:  68%|######8   | 1187/1743 [00:38<00:19, 29.21date/s]
+Diagnosing test set:  68%|######8   | 1190/1743 [00:38<00:18, 29.30date/s]
+Diagnosing test set:  69%|######8   | 1194/1743 [00:38<00:18, 29.68date/s]
+Diagnosing test set:  69%|######8   | 1197/1743 [00:38<00:18, 29.60date/s]
+Diagnosing test set:  69%|######8   | 1200/1743 [00:38<00:18, 29.58date/s]
+Diagnosing test set:  69%|######9   | 1203/1743 [00:38<00:18, 29.21date/s]
+Diagnosing test set:  69%|######9   | 1206/1743 [00:38<00:18, 29.00date/s]
+Diagnosing test set:  69%|######9   | 1209/1743 [00:38<00:18, 29.03date/s]
+Diagnosing test set:  70%|######9   | 1212/1743 [00:39<00:18, 29.23date/s]
+Diagnosing test set:  70%|######9   | 1216/1743 [00:39<00:17, 29.29date/s]
+Diagnosing test set:  70%|######9   | 1220/1743 [00:39<00:17, 29.67date/s]
+Diagnosing test set:  70%|#######   | 1224/1743 [00:39<00:17, 30.50date/s]
+Diagnosing test set:  70%|#######   | 1228/1743 [00:39<00:17, 30.18date/s]
+Diagnosing test set:  71%|#######   | 1232/1743 [00:39<00:17, 29.81date/s]
+Diagnosing test set:  71%|#######   | 1236/1743 [00:39<00:16, 30.19date/s]
+Diagnosing test set:  71%|#######1  | 1240/1743 [00:39<00:16, 29.93date/s]
+Diagnosing test set:  71%|#######1  | 1243/1743 [00:40<00:16, 29.88date/s]
+Diagnosing test set:  72%|#######1  | 1247/1743 [00:40<00:16, 30.20date/s]
+Diagnosing test set:  72%|#######1  | 1251/1743 [00:40<00:16, 29.71date/s]
+Diagnosing test set:  72%|#######2  | 1255/1743 [00:40<00:16, 29.99date/s]
+Diagnosing test set:  72%|#######2  | 1259/1743 [00:40<00:16, 30.18date/s]
+Diagnosing test set:  72%|#######2  | 1263/1743 [00:40<00:16, 29.79date/s]
+Diagnosing test set:  73%|#######2  | 1267/1743 [00:40<00:15, 29.97date/s]
+Diagnosing test set:  73%|#######2  | 1270/1743 [00:40<00:15, 29.59date/s]
+Diagnosing test set:  73%|#######3  | 1273/1743 [00:41<00:16, 29.35date/s]
+Diagnosing test set:  73%|#######3  | 1277/1743 [00:41<00:15, 29.43date/s]
+Diagnosing test set:  73%|#######3  | 1280/1743 [00:41<00:15, 29.38date/s]
+Diagnosing test set:  74%|#######3  | 1283/1743 [00:41<00:15, 29.27date/s]
+Diagnosing test set:  74%|#######3  | 1287/1743 [00:41<00:14, 30.78date/s]
+Diagnosing test set:  74%|#######4  | 1291/1743 [00:41<00:13, 32.58date/s]
+Diagnosing test set:  74%|#######4  | 1295/1743 [00:41<00:13, 33.40date/s]
+Diagnosing test set:  75%|#######4  | 1299/1743 [00:41<00:14, 31.64date/s]
+Diagnosing test set:  75%|#######4  | 1303/1743 [00:42<00:14, 30.69date/s]
+Diagnosing test set:  75%|#######4  | 1307/1743 [00:42<00:14, 30.01date/s]
+Diagnosing test set:  75%|#######5  | 1311/1743 [00:42<00:14, 29.93date/s]
+Diagnosing test set:  75%|#######5  | 1315/1743 [00:42<00:14, 30.48date/s]
+Diagnosing test set:  76%|#######5  | 1319/1743 [00:42<00:14, 30.18date/s]
+Diagnosing test set:  76%|#######5  | 1323/1743 [00:42<00:14, 29.88date/s]
+Diagnosing test set:  76%|#######6  | 1326/1743 [00:42<00:14, 29.64date/s]
+Diagnosing test set:  76%|#######6  | 1330/1743 [00:42<00:13, 29.87date/s]
+Diagnosing test set:  77%|#######6  | 1334/1743 [00:43<00:13, 30.01date/s]
+Diagnosing test set:  77%|#######6  | 1338/1743 [00:43<00:13, 30.02date/s]
+Diagnosing test set:  77%|#######6  | 1342/1743 [00:43<00:13, 29.61date/s]
+Diagnosing test set:  77%|#######7  | 1346/1743 [00:43<00:13, 30.09date/s]
+Diagnosing test set:  77%|#######7  | 1350/1743 [00:43<00:12, 30.46date/s]
+Diagnosing test set:  78%|#######7  | 1354/1743 [00:43<00:12, 30.76date/s]
+Diagnosing test set:  78%|#######7  | 1358/1743 [00:43<00:12, 30.49date/s]
+Diagnosing test set:  78%|#######8  | 1362/1743 [00:44<00:12, 29.43date/s]
+Diagnosing test set:  78%|#######8  | 1365/1743 [00:44<00:12, 29.37date/s]
+Diagnosing test set:  78%|#######8  | 1368/1743 [00:44<00:12, 29.50date/s]
+Diagnosing test set:  79%|#######8  | 1371/1743 [00:44<00:12, 29.56date/s]
+Diagnosing test set:  79%|#######8  | 1375/1743 [00:44<00:12, 30.13date/s]
+Diagnosing test set:  79%|#######9  | 1379/1743 [00:44<00:12, 30.32date/s]
+Diagnosing test set:  79%|#######9  | 1383/1743 [00:44<00:11, 30.33date/s]
+Diagnosing test set:  80%|#######9  | 1387/1743 [00:44<00:11, 30.56date/s]
+Diagnosing test set:  80%|#######9  | 1391/1743 [00:44<00:11, 30.13date/s]
+Diagnosing test set:  80%|########  | 1395/1743 [00:45<00:11, 29.71date/s]
+Diagnosing test set:  80%|########  | 1398/1743 [00:45<00:11, 29.77date/s]
+Diagnosing test set:  80%|########  | 1402/1743 [00:45<00:11, 30.45date/s]
+Diagnosing test set:  81%|########  | 1406/1743 [00:45<00:11, 30.60date/s]
+Diagnosing test set:  81%|########  | 1410/1743 [00:45<00:10, 30.53date/s]
+Diagnosing test set:  81%|########1 | 1414/1743 [00:45<00:10, 29.95date/s]
+Diagnosing test set:  81%|########1 | 1418/1743 [00:45<00:10, 29.86date/s]
+Diagnosing test set:  82%|########1 | 1422/1743 [00:46<00:10, 30.35date/s]
+Diagnosing test set:  82%|########1 | 1426/1743 [00:46<00:10, 30.14date/s]
+Diagnosing test set:  82%|########2 | 1430/1743 [00:46<00:10, 30.47date/s]
+Diagnosing test set:  82%|########2 | 1434/1743 [00:46<00:10, 30.22date/s]
+Diagnosing test set:  83%|########2 | 1438/1743 [00:46<00:10, 30.38date/s]
+Diagnosing test set:  83%|########2 | 1442/1743 [00:46<00:09, 30.53date/s]
+Diagnosing test set:  83%|########2 | 1446/1743 [00:46<00:09, 30.18date/s]
+Diagnosing test set:  83%|########3 | 1450/1743 [00:46<00:09, 29.63date/s]
+Diagnosing test set:  83%|########3 | 1454/1743 [00:47<00:09, 29.94date/s]
+Diagnosing test set:  84%|########3 | 1457/1743 [00:47<00:09, 29.35date/s]
+Diagnosing test set:  84%|########3 | 1460/1743 [00:47<00:09, 29.50date/s]
+Diagnosing test set:  84%|########3 | 1464/1743 [00:47<00:09, 30.43date/s]
+Diagnosing test set:  84%|########4 | 1468/1743 [00:47<00:08, 30.56date/s]
+Diagnosing test set:  84%|########4 | 1472/1743 [00:47<00:08, 31.16date/s]
+Diagnosing test set:  85%|########4 | 1476/1743 [00:47<00:08, 31.15date/s]
+Diagnosing test set:  85%|########4 | 1480/1743 [00:47<00:08, 31.13date/s]
+Diagnosing test set:  85%|########5 | 1484/1743 [00:48<00:08, 31.62date/s]
+Diagnosing test set:  85%|########5 | 1488/1743 [00:48<00:08, 31.37date/s]
+Diagnosing test set:  86%|########5 | 1492/1743 [00:48<00:08, 31.30date/s]
+Diagnosing test set:  86%|########5 | 1496/1743 [00:48<00:07, 31.69date/s]
+Diagnosing test set:  86%|########6 | 1500/1743 [00:48<00:07, 30.79date/s]
+Diagnosing test set:  86%|########6 | 1504/1743 [00:48<00:07, 30.18date/s]
+Diagnosing test set:  87%|########6 | 1508/1743 [00:48<00:07, 29.57date/s]
+Diagnosing test set:  87%|########6 | 1511/1743 [00:48<00:07, 29.02date/s]
+Diagnosing test set:  87%|########6 | 1515/1743 [00:49<00:07, 28.99date/s]
+Diagnosing test set:  87%|########7 | 1519/1743 [00:49<00:07, 29.27date/s]
+Diagnosing test set:  87%|########7 | 1523/1743 [00:49<00:07, 29.81date/s]
+Diagnosing test set:  88%|########7 | 1526/1743 [00:49<00:07, 29.75date/s]
+Diagnosing test set:  88%|########7 | 1530/1743 [00:49<00:07, 29.78date/s]
+Diagnosing test set:  88%|########7 | 1533/1743 [00:49<00:07, 29.72date/s]
+Diagnosing test set:  88%|########8 | 1537/1743 [00:49<00:06, 29.92date/s]
+Diagnosing test set:  88%|########8 | 1541/1743 [00:49<00:06, 30.23date/s]
+Diagnosing test set:  89%|########8 | 1545/1743 [00:50<00:06, 28.99date/s]
+Diagnosing test set:  89%|########8 | 1548/1743 [00:50<00:06, 29.16date/s]
+Diagnosing test set:  89%|########9 | 1552/1743 [00:50<00:06, 29.10date/s]
+Diagnosing test set:  89%|########9 | 1556/1743 [00:50<00:06, 29.80date/s]
+Diagnosing test set:  89%|########9 | 1559/1743 [00:50<00:06, 29.77date/s]
+Diagnosing test set:  90%|########9 | 1562/1743 [00:50<00:06, 29.73date/s]
+Diagnosing test set:  90%|########9 | 1565/1743 [00:50<00:06, 28.39date/s]
+Diagnosing test set:  90%|######### | 1569/1743 [00:50<00:06, 28.95date/s]
+Diagnosing test set:  90%|######### | 1572/1743 [00:51<00:05, 28.63date/s]
+Diagnosing test set:  90%|######### | 1575/1743 [00:51<00:05, 28.61date/s]
+Diagnosing test set:  91%|######### | 1579/1743 [00:51<00:05, 28.98date/s]
+Diagnosing test set:  91%|######### | 1583/1743 [00:51<00:05, 29.30date/s]
+Diagnosing test set:  91%|#########1| 1587/1743 [00:51<00:05, 29.69date/s]
+Diagnosing test set:  91%|#########1| 1590/1743 [00:51<00:05, 29.72date/s]
+Diagnosing test set:  91%|#########1| 1594/1743 [00:51<00:04, 30.05date/s]
+Diagnosing test set:  92%|#########1| 1597/1743 [00:51<00:04, 29.75date/s]
+Diagnosing test set:  92%|#########1| 1601/1743 [00:51<00:04, 30.20date/s]
+Diagnosing test set:  92%|#########2| 1605/1743 [00:52<00:04, 30.55date/s]
+Diagnosing test set:  92%|#########2| 1609/1743 [00:52<00:04, 30.63date/s]
+Diagnosing test set:  93%|#########2| 1613/1743 [00:52<00:04, 30.76date/s]
+Diagnosing test set:  93%|#########2| 1617/1743 [00:52<00:04, 30.64date/s]
+Diagnosing test set:  93%|#########3| 1621/1743 [00:52<00:04, 30.41date/s]
+Diagnosing test set:  93%|#########3| 1625/1743 [00:52<00:03, 30.21date/s]
+Diagnosing test set:  93%|#########3| 1629/1743 [00:52<00:03, 30.35date/s]
+Diagnosing test set:  94%|#########3| 1633/1743 [00:53<00:03, 30.60date/s]
+Diagnosing test set:  94%|#########3| 1637/1743 [00:53<00:03, 30.69date/s]
+Diagnosing test set:  94%|#########4| 1641/1743 [00:53<00:03, 31.19date/s]
+Diagnosing test set:  94%|#########4| 1645/1743 [00:53<00:03, 31.13date/s]
+Diagnosing test set:  95%|#########4| 1649/1743 [00:53<00:03, 31.07date/s]
+Diagnosing test set:  95%|#########4| 1653/1743 [00:53<00:02, 31.14date/s]
+Diagnosing test set:  95%|#########5| 1657/1743 [00:53<00:02, 30.81date/s]
+Diagnosing test set:  95%|#########5| 1661/1743 [00:53<00:02, 30.83date/s]
+Diagnosing test set:  96%|#########5| 1665/1743 [00:54<00:02, 29.66date/s]
+Diagnosing test set:  96%|#########5| 1668/1743 [00:54<00:02, 29.58date/s]
+Diagnosing test set:  96%|#########5| 1672/1743 [00:54<00:02, 30.69date/s]
+Diagnosing test set:  96%|#########6| 1676/1743 [00:54<00:02, 31.32date/s]
+Diagnosing test set:  96%|#########6| 1680/1743 [00:54<00:02, 30.81date/s]
+Diagnosing test set:  97%|#########6| 1684/1743 [00:54<00:01, 31.22date/s]
+Diagnosing test set:  97%|#########6| 1688/1743 [00:54<00:01, 29.84date/s]
+Diagnosing test set:  97%|#########7| 1692/1743 [00:54<00:01, 30.63date/s]
+Diagnosing test set:  97%|#########7| 1696/1743 [00:55<00:01, 31.15date/s]
+Diagnosing test set:  98%|#########7| 1700/1743 [00:55<00:01, 31.27date/s]
+Diagnosing test set:  98%|#########7| 1704/1743 [00:55<00:01, 31.85date/s]
+Diagnosing test set:  98%|#########7| 1708/1743 [00:55<00:01, 32.29date/s]
+Diagnosing test set:  98%|#########8| 1712/1743 [00:55<00:00, 32.10date/s]
+Diagnosing test set:  98%|#########8| 1716/1743 [00:55<00:00, 32.16date/s]
+Diagnosing test set:  99%|#########8| 1720/1743 [00:55<00:00, 32.18date/s]
+Diagnosing test set:  99%|#########8| 1724/1743 [00:55<00:00, 32.25date/s]
+Diagnosing test set:  99%|#########9| 1728/1743 [00:56<00:00, 31.94date/s]
+Diagnosing test set:  99%|#########9| 1732/1743 [00:56<00:00, 31.98date/s]
+Diagnosing test set: 100%|#########9| 1736/1743 [00:56<00:00, 32.18date/s]
+Diagnosing test set: 100%|#########9| 1740/1743 [00:56<00:00, 31.94date/s]
+Diagnosing test set: 100%|##########| 1743/1743 [00:56<00:00, 30.83date/s]
+
+
+-----------------------------------------------------------------
+2b. POSTERIOR IC LEAKAGE CHECK (VAL)  [OK]
+-----------------------------------------------------------------
+============================================================
+POSTERIOR IC LEAKAGE CHECK  --  split=VAL
+Checkpoint: best-v1.ckpt
+============================================================
+                    Mean     Std  % Positive
+                                            
+Prior IC (prod)  +0.0266 +0.1442      +58.4%
+Post IC (oracle) +0.1262 +0.1279      +84.1%
+Gap (post-prior) +0.0996 +0.1286      +84.1%
+
+Interpretation:
+  [OK] Posterior IC (+0.1262) > Prior IC (+0.0266) on held-out data
+    Gap = +0.0996. Signal exists; teacher-student gap is real.
+
+Per-date results saved to: results\diagnostics\posterior_ic_val.csv
+
+[STDERR]
+M:\Python Projects\FactorVAE\.venv\Lib\site-packages\torchmetrics\utilities\imports.py:22: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  from pkg_resources import DistributionNotFound, get_distribution
+
+Diagnosing val set:   0%|          | 0/245 [00:00<?, ?date/s]
+Diagnosing val set:   0%|          | 1/245 [00:00<01:13,  3.32date/s]
+Diagnosing val set:   2%|1         | 4/245 [00:00<00:22, 10.78date/s]
+Diagnosing val set:   3%|2         | 7/245 [00:00<00:15, 15.21date/s]
+Diagnosing val set:   4%|4         | 10/245 [00:00<00:12, 19.14date/s]
+Diagnosing val set:   6%|5         | 14/245 [00:00<00:09, 23.93date/s]
+Diagnosing val set:   7%|7         | 18/245 [00:00<00:08, 27.37date/s]
+Diagnosing val set:   9%|8         | 22/245 [00:01<00:07, 29.30date/s]
+Diagnosing val set:  11%|#         | 26/245 [00:01<00:07, 30.58date/s]
+Diagnosing val set:  12%|#2        | 30/245 [00:01<00:06, 31.70date/s]
+Diagnosing val set:  14%|#3        | 34/245 [00:01<00:06, 32.73date/s]
+Diagnosing val set:  16%|#5        | 38/245 [00:01<00:06, 32.92date/s]
+Diagnosing val set:  17%|#7        | 42/245 [00:01<00:06, 33.24date/s]
+Diagnosing val set:  19%|#8        | 46/245 [00:01<00:05, 33.81date/s]
+Diagnosing val set:  20%|##        | 50/245 [00:01<00:05, 34.03date/s]
+Diagnosing val set:  22%|##2       | 54/245 [00:01<00:05, 33.87date/s]
+Diagnosing val set:  24%|##3       | 58/245 [00:02<00:05, 34.25date/s]
+Diagnosing val set:  25%|##5       | 62/245 [00:02<00:05, 33.98date/s]
+Diagnosing val set:  27%|##6       | 66/245 [00:02<00:05, 33.80date/s]
+Diagnosing val set:  29%|##8       | 70/245 [00:02<00:05, 33.76date/s]
+Diagnosing val set:  30%|###       | 74/245 [00:02<00:05, 33.72date/s]
+Diagnosing val set:  32%|###1      | 78/245 [00:02<00:04, 33.70date/s]
+Diagnosing val set:  33%|###3      | 82/245 [00:02<00:04, 34.34date/s]
+Diagnosing val set:  35%|###5      | 86/245 [00:02<00:04, 34.27date/s]
+Diagnosing val set:  37%|###6      | 90/245 [00:03<00:04, 33.93date/s]
+Diagnosing val set:  38%|###8      | 94/245 [00:03<00:04, 33.60date/s]
+Diagnosing val set:  40%|####      | 98/245 [00:03<00:04, 33.65date/s]
+Diagnosing val set:  42%|####1     | 102/245 [00:03<00:04, 33.99date/s]
+Diagnosing val set:  43%|####3     | 106/245 [00:03<00:04, 33.34date/s]
+Diagnosing val set:  45%|####4     | 110/245 [00:03<00:04, 33.28date/s]
+Diagnosing val set:  47%|####6     | 114/245 [00:03<00:03, 33.32date/s]
+Diagnosing val set:  48%|####8     | 118/245 [00:03<00:03, 32.46date/s]
+Diagnosing val set:  50%|####9     | 122/245 [00:03<00:03, 32.83date/s]
+Diagnosing val set:  51%|#####1    | 126/245 [00:04<00:03, 33.38date/s]
+Diagnosing val set:  53%|#####3    | 130/245 [00:04<00:03, 33.23date/s]
+Diagnosing val set:  55%|#####4    | 134/245 [00:04<00:03, 32.69date/s]
+Diagnosing val set:  56%|#####6    | 138/245 [00:04<00:03, 32.93date/s]
+Diagnosing val set:  58%|#####7    | 142/245 [00:04<00:03, 32.56date/s]
+Diagnosing val set:  60%|#####9    | 146/245 [00:04<00:02, 33.29date/s]
+Diagnosing val set:  61%|######1   | 150/245 [00:04<00:02, 34.24date/s]
+Diagnosing val set:  63%|######3   | 155/245 [00:04<00:02, 36.91date/s]
+Diagnosing val set:  65%|######4   | 159/245 [00:05<00:02, 37.60date/s]
+Diagnosing val set:  67%|######6   | 163/245 [00:05<00:02, 37.75date/s]
+Diagnosing val set:  68%|######8   | 167/245 [00:05<00:02, 35.57date/s]
+Diagnosing val set:  70%|######9   | 171/245 [00:05<00:02, 34.91date/s]
+Diagnosing val set:  71%|#######1  | 175/245 [00:05<00:02, 34.39date/s]
+Diagnosing val set:  73%|#######3  | 179/245 [00:05<00:01, 34.27date/s]
+Diagnosing val set:  75%|#######4  | 183/245 [00:05<00:01, 34.58date/s]
+Diagnosing val set:  76%|#######6  | 187/245 [00:05<00:01, 33.55date/s]
+Diagnosing val set:  78%|#######7  | 191/245 [00:05<00:01, 33.49date/s]
+Diagnosing val set:  80%|#######9  | 195/245 [00:06<00:01, 33.32date/s]
+Diagnosing val set:  81%|########1 | 199/245 [00:06<00:01, 32.73date/s]
+Diagnosing val set:  83%|########2 | 203/245 [00:06<00:01, 33.70date/s]
+Diagnosing val set:  84%|########4 | 207/245 [00:06<00:01, 34.33date/s]
+Diagnosing val set:  86%|########6 | 211/245 [00:06<00:00, 34.66date/s]
+Diagnosing val set:  88%|########7 | 215/245 [00:06<00:00, 34.82date/s]
+Diagnosing val set:  89%|########9 | 219/245 [00:06<00:00, 34.76date/s]
+Diagnosing val set:  91%|#########1| 223/245 [00:06<00:00, 34.44date/s]
+Diagnosing val set:  93%|#########2| 227/245 [00:07<00:00, 34.35date/s]
+Diagnosing val set:  94%|#########4| 231/245 [00:07<00:00, 34.33date/s]
+Diagnosing val set:  96%|#########5| 235/245 [00:07<00:00, 34.44date/s]
+Diagnosing val set:  98%|#########7| 239/245 [00:07<00:00, 34.13date/s]
+Diagnosing val set:  99%|#########9| 243/245 [00:07<00:00, 33.99date/s]
+Diagnosing val set: 100%|##########| 245/245 [00:07<00:00, 32.41date/s]
+
+
+-----------------------------------------------------------------
+3. METRIC ARITHMETIC BREAKDOWN  [OK]
+-----------------------------------------------------------------
+======================================================================
+METRIC ARITHMETIC BREAKDOWN
+TopK-Drop  k=50  drop=5  |  1743 trading days
+======================================================================
+  n_days                                     1743
+  daily_mean_port (bps)                   +3.8920
+  daily_mean_bench(bps)                   +4.3673
+  daily_mean_excess(bps)                  -0.4752
+  ann_return   (%)                        +9.8079
+  ann_bench    (%)                       +11.0055
+  ann_excess   (%)                        -1.1976
+  vol_port     (%)                       +21.6111
+  vol_bench    (%)                       +26.5225
+  tracking_err (%)                        +7.8952
+  Sharpe (ann/vol_port)                   +0.4538
+  IR    (exc/te)                          -0.1517  [REPORTED]
+  max_drawdown (%)                       +19.8667
+  hit_rate (%)                           +49.5697
+
+NOTE: The 'Sharpe' column in comparison_table.csv is computed as
+      ann_excess_return / tracking_error_vol  (= Information Ratio).
+      Traditional Sharpe (ann_return / vol_port) is shown above.
+
+Official compute_performance_metrics() output:
+  annualized_return              +0.0981
+  annualized_excess              -0.0120
+  volatility                     +0.2161
+  sharpe                         -0.1517
+  information_ratio              -0.1517
+  max_drawdown                   +0.1987
+  calmar                         -0.0603
+  hit_rate                       +0.4957
+  avg_turnover                   +0.1318
+
+Saved to: results\diagnostics\metric_arithmetic.txt

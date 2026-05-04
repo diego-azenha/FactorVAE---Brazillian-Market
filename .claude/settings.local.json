@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(Test-Path *)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Skill(keybindings-help)",
+      "PowerShell(Set-Location \"M:\\\\Python Projects\\\\FactorVAE\"; Get-ChildItem -Force | Select-Object Name, @{N=\"Type\"; E={if\\($_.PSIsContainer\\){\"DIR\"}else{\"FILE\"}}} | Format-Table -AutoSize)",
+      "PowerShell(Get-ChildItem \"M:\\\\Python Projects\\\\FactorVAE\\\\results\" -Recurse -File | Select-Object Name, @{N=\"Size_MB\"; E={\"{0:N2}\" -f \\($_.Length/1MB\\)}} | Format-Table -AutoSize)",
+      "PowerShell(Get-ChildItem \"M:\\\\Python Projects\\\\FactorVAE\\\\checkpoints\" -File | Select-Object Name, @{N=\"Size_MB\"; E={\"{0:N2}\" -f \\($_.Length/1MB\\)}})",
+      "Bash(python -m pytest tests/ -q --collect-only)"
+    ]
+  }
+}

@@ -35,6 +35,7 @@ def kl_loss(
     """
     KL(posterior || prior) for the factor distribution.
     q = posterior (encoder), p = prior (predictor). Do not swap.
-    Summed over K factors.
+    Averaged over K factors (matching the NLL averaged over N stocks)
+    to keep both terms on the same scale in the ELBO.
     """
     return kl_gaussian_diagonal(mu_post, sigma_post, mu_prior, sigma_prior, floor)

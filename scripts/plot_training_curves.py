@@ -85,7 +85,7 @@ def main() -> None:
     fig.subplots_adjust(top=0.83, bottom=0.08, left=0.07, right=0.93, hspace=0.32, wspace=0.28)
 
     # [0,0] Total training loss
-    axes[0, 0].plot(train.index, train["train_loss"], "o-", markersize=4,
+    axes[0, 0].plot(train.index, train["train_loss"], "-",
                     color=PALETTE[0])
     axes[0, 0].set_title("Perda total")
     axes[0, 0].set_xlabel("Época")
@@ -95,7 +95,7 @@ def main() -> None:
     # [0,1] Reconstruction loss with marginal reference
     if "train_loss_recon" in train.columns:
         axes[0, 1].plot(
-            train.index, train["train_loss_recon"], "o-", markersize=4, color=PALETTE[1]
+            train.index, train["train_loss_recon"], "-", color=PALETTE[1]
         )
         axes[0, 1].axhline(
             _NLL_FLOOR,
@@ -116,7 +116,7 @@ def main() -> None:
     # [1,0] KL divergence
     if "train_loss_kl" in train.columns:
         axes[1, 0].plot(
-            train.index, train["train_loss_kl"], "o-", markersize=4, color=PALETTE[2]
+            train.index, train["train_loss_kl"], "-", color=PALETTE[2]
         )
     else:
         axes[1, 0].text(0.5, 0.5, "train_loss_kl\nnot logged",
@@ -128,7 +128,7 @@ def main() -> None:
 
     # [1,1] Validation Rank IC
     axes[1, 1].plot(
-        val.index, val["val_rank_ic"], "o-", markersize=4, color=PALETTE[3]
+        val.index, val["val_rank_ic"], "-", color=PALETTE[3]
     )
     axes[1, 1].axhline(0, color=TEXT_SECONDARY, linestyle="--", linewidth=0.5)
     axes[1, 1].set_title("Rank IC (validação)")

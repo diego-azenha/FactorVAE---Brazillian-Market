@@ -151,6 +151,7 @@ def test_kl_nonnegative():
 def test_kl_matches_monte_carlo():
     """
     KL should match Monte Carlo estimate (100k samples) within 1e-2.
+    kl_gaussian_diagonal returns the mean over K dimensions.
     """
     torch.manual_seed(9)
     K = 4
@@ -161,12 +162,13 @@ def test_kl_matches_monte_carlo():
 
     kl_analytic = kl_gaussian_diagonal(mu_q, sigma_q, mu_p, sigma_p).item()
 
-    # MC estimate: E_q[log q(z) - log p(z)]
+    # MC estimate: E_q[log q(z) - log p(z)], then averaged over K dimensions
     n = 100_000
     z = mu_q + sigma_q * torch.randn(n, K)
     log_q = scipy.stats.norm.logpdf(z.numpy(), loc=mu_q.numpy(), scale=sigma_q.numpy()).sum(axis=1)
     log_p = scipy.stats.norm.logpdf(z.numpy(), loc=mu_p.numpy(), scale=sigma_p.numpy()).sum(axis=1)
-    kl_mc = float(np.mean(log_q - log_p))
+    # sum(axis=1) sums over K; divide by K to get the mean per dimension
+    kl_mc = float(np.mean(log_q - log_p)) / K
 
     assert abs(kl_analytic - kl_mc) < 1e-2, f"KL analytic={kl_analytic:.4f}  MC={kl_mc:.4f}"
 

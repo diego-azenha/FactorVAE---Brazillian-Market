@@ -78,10 +78,15 @@ def kl_gaussian_diagonal(
     floor: float = 1e-6,
 ) -> Tensor:
     """
-    KL(N(mu_q, sigma_q^2) || N(mu_p, sigma_p^2)), summed over all dimensions.
+    KL(N(mu_q, sigma_q^2) || N(mu_p, sigma_p^2)), averaged over all dimensions.
 
     Closed-form for diagonal Gaussians:
-        KL = log(sigma_p/sigma_q) + (sigma_q^2 + (mu_q-mu_p)^2)/(2*sigma_p^2) - 0.5
+        KL_k = log(sigma_p_k/sigma_q_k) + (sigma_q_k^2 + (mu_q_k-mu_p_k)^2)/(2*sigma_p_k^2) - 0.5
+
+    Returns the mean over K factor dimensions (not the sum) so that the KL term
+    is on the same scale as the NLL reconstruction term averaged over N stocks.
+    With K=16 factors and N≈400 stocks, using sum() instead of mean() causes a
+    ~25x scale imbalance that over-weights the KL term in the ELBO.
 
     IMPORTANT: q is the posterior (from encoder), p is the learned prior (from predictor).
     Swapping arguments inverts the gradient of the predictor.
@@ -92,10 +97,10 @@ def kl_gaussian_diagonal(
         floor: minimum sigma value
 
     Returns:
-        scalar Tensor (summed, not averaged, over K)
+        scalar Tensor (mean over K dimensions)
     """
     sigma_q = sigma_q.clamp(min=floor)
     sigma_p = sigma_p.clamp(min=floor)
     term1 = torch.log(sigma_p / sigma_q)
     term2 = (sigma_q ** 2 + (mu_q - mu_p) ** 2) / (2.0 * sigma_p ** 2)
-    return (term1 + term2 - 0.5).sum()
+    return (term1 + term2 - 0.5).mean()
