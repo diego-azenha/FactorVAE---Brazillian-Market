@@ -15,7 +15,7 @@ from pathlib import Path
 import torch
 import yaml
 import lightning as L
-from lightning.pytorch.callbacks import ModelCheckpoint, RichProgressBar, Callback
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, RichProgressBar, Callback
 
 # Use Tensor Cores on Ampere+ GPUs (RTX 30xx and above) for faster matmul.
 # 'high' trades a tiny amount of float32 precision for significant throughput gain.
@@ -82,6 +82,12 @@ def main() -> None:
             monitor="val_rank_ic",
             mode="max",
             save_last=True,
+        ),
+        EarlyStopping(
+            monitor="val_rank_ic",
+            mode="max",
+            patience=10,
+            verbose=True,
         ),
     ]
 

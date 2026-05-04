@@ -76,6 +76,7 @@ def kl_gaussian_diagonal(
     mu_p: Tensor,
     sigma_p: Tensor,
     floor: float = 1e-6,
+    free_bits: float = 0.0,
 ) -> Tensor:
     """
     KL(N(mu_q, sigma_q^2) || N(mu_p, sigma_p^2)), averaged over all dimensions.
@@ -94,7 +95,10 @@ def kl_gaussian_diagonal(
     Args:
         mu_q, sigma_q: posterior parameters, shape (K,)
         mu_p, sigma_p: prior parameters,     shape (K,)
-        floor: minimum sigma value
+        floor:     minimum sigma value
+        free_bits: minimum nats per factor dimension; KL gradient is zeroed below
+                   this threshold, forcing the encoder to use its latent budget.
+                   Set to 0.0 (default) to disable.
 
     Returns:
         scalar Tensor (mean over K dimensions)
@@ -103,4 +107,7 @@ def kl_gaussian_diagonal(
     sigma_p = sigma_p.clamp(min=floor)
     term1 = torch.log(sigma_p / sigma_q)
     term2 = (sigma_q ** 2 + (mu_q - mu_p) ** 2) / (2.0 * sigma_p ** 2)
-    return (term1 + term2 - 0.5).mean()
+    per_dim = term1 + term2 - 0.5                          # (K,)
+    if free_bits > 0.0:
+        per_dim = per_dim.clamp(min=free_bits)
+    return per_dim.mean()

@@ -24,6 +24,9 @@ class FactorVAELightning(L.LightningModule):
         self.lr = config["training"]["learning_rate"]
         self.gamma = config["training"]["gamma"]
         self.floor = config["training"]["sigma_floor"]
+        self.kl_warmup_steps = config["training"].get("kl_warmup_steps", 0)
+        self.kl_free_bits = config["training"].get("kl_free_bits", 0.0)
+        self.weight_decay = config["training"].get("weight_decay", 0.0)
         self.save_hyperparameters(config)
         self._val_rank_ics: list[float] = []
         # Buffers for per-factor distribution snapshot (filled in training_step)
@@ -49,12 +52,21 @@ class FactorVAELightning(L.LightningModule):
 
         out = self.model.forward_train(x, y, m=m)
         loss_r = reconstruction_loss(y, out["mu_y_rec"], out["sigma_y_rec"], self.floor)
-        loss_k = kl_loss(out["mu_post"], out["sigma_post"], out["mu_prior"], out["sigma_prior"], self.floor)
-        loss = loss_r + self.gamma * loss_k
+        loss_k = kl_loss(out["mu_post"], out["sigma_post"], out["mu_prior"], out["sigma_prior"],
+                         self.floor, self.kl_free_bits)
 
-        self.log("train_loss_recon", loss_r, on_step=False, on_epoch=True, prog_bar=False)
-        self.log("train_loss_kl",    loss_k, on_step=False, on_epoch=True, prog_bar=False)
-        self.log("train_loss",       loss,   on_step=False, on_epoch=True, prog_bar=True)
+        # Linear KL warmup: ramp gamma from 0 → gamma over kl_warmup_steps
+        if self.kl_warmup_steps > 0:
+            gamma_eff = self.gamma * min(1.0, self.global_step / self.kl_warmup_steps)
+        else:
+            gamma_eff = self.gamma
+
+        loss = loss_r + gamma_eff * loss_k
+
+        self.log("train_loss_recon", loss_r,    on_step=False, on_epoch=True, prog_bar=False)
+        self.log("train_loss_kl",    loss_k,    on_step=False, on_epoch=True, prog_bar=False)
+        self.log("train_gamma_eff",  gamma_eff, on_step=False, on_epoch=True, prog_bar=False)
+        self.log("train_loss",       loss,      on_step=False, on_epoch=True, prog_bar=True)
 
         # Accumulate per-factor distribution params for snapshot visualization
         self._prior_mu_buf.append(out["mu_prior"].detach().cpu())
@@ -113,4 +125,4 @@ class FactorVAELightning(L.LightningModule):
     # ─── Optimizer ──────────────────────────────────────────
 
     def configure_optimizers(self):
-        return optim.Adam(self.parameters(), lr=self.lr)
+        return optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)

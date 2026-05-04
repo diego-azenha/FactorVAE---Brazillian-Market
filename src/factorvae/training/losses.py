@@ -31,11 +31,15 @@ def kl_loss(
     mu_prior: Tensor,
     sigma_prior: Tensor,
     floor: float = 1e-6,
+    free_bits: float = 0.0,
 ) -> Tensor:
     """
     KL(posterior || prior) for the factor distribution.
     q = posterior (encoder), p = prior (predictor). Do not swap.
     Averaged over K factors (matching the NLL averaged over N stocks)
     to keep both terms on the same scale in the ELBO.
+
+    Args:
+        free_bits: minimum nats per factor; passed through to kl_gaussian_diagonal.
     """
-    return kl_gaussian_diagonal(mu_post, sigma_post, mu_prior, sigma_prior, floor)
+    return kl_gaussian_diagonal(mu_post, sigma_post, mu_prior, sigma_prior, floor, free_bits)
