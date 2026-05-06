@@ -1,202 +1,110 @@
-﻿# FactorVAE — Mercado Brasileiro (B3)
+# FactorVAE - Mercado Brasileiro (B3)
 
-Replicacao e extensao de [Duan et al. (2022) *"FactorVAE: A Probabilistic Dynamic Factor Model Based on Variational Autoencoder for Predicting Cross-Sectional Stock Returns"*](https://ojs.aaai.org/index.php/AAAI/article/view/20369) aplicada ao universo de acoes da B3, periodo 2010-2025.
+Implementacao do FactorVAE aplicada a acoes da B3, com foco em previsao cross-sectional de retornos e avaliacao economica via estrategia TopK-Drop.
 
----
-
-![Retorno acumulado em excesso vs benchmark](results/figures/cumulative_excess_return.png)
-
-*Estrategia TopK-Drop, k=50 acoes, n=5 substituicoes/dia, taxa de 10 bps. O FactorVAE (vermelho) mantem alfa positivo ao longo de todo o periodo de teste (2019-2025), enquanto todos os benchmarks perdem consistentemente para o mercado igual-ponderado.*
-
----
+O projeto compara o FactorVAE com benchmarks simples e neurais sobre o periodo de teste de 2019-01-01 a 2025-12-31. O resultado principal da versao atual e direto: o modelo entrega a melhor combinacao entre retorno absoluto, qualidade de sinal e implementabilidade entre os modelos testados, embora o excesso anualizado contra o benchmark igual-ponderado fique praticamente neutro depois de custos.
 
 ## Conteudo
 
-1. [O Problema](#1-o-problema)
-2. [Metodologia](#2-metodologia)
-   - [Dados e features](#21-dados-e-features)
-   - [Arquitetura do modelo](#22-arquitetura-do-modelo)
-   - [Funcao objetivo](#23-funcao-objetivo)
-   - [Estrategia de portfolio](#24-estrategia-de-portfolio)
-3. [Resultados](#3-resultados)
-4. [Como reproduzir](#4-como-reproduzir)
-5. [Estrutura do repositorio](#5-estrutura-do-repositorio)
+1. Visao geral
+2. Principais resultados
+3. Figuras
+4. Tabelas comparativas
+5. Como reproduzir
+6. Estrutura do repositorio
 
----
+## 1. Visao geral
 
-## 1. O Problema
+O FactorVAE combina:
 
-Prever retornos *cross-seccionais* de acoes e um dos problemas centrais de financas quantitativas. A pergunta e objetiva: dadas as caracteristicas historicas de $N$ acoes ate a data $t$, qual o ranqueamento dos retornos futuros $y_{t+1}$?
+- extrator temporal com GRU para resumir o historico recente de cada ativo;
+- fatores latentes probabilisticos para modelar o estado do mercado;
+- decoder fatorial para mapear fatores em retornos previstos por ativo;
+- avaliacao economica em carteira, nao apenas metricas estatisticas.
 
-O desafio no mercado brasileiro e triplo:
+O backtest usa uma estrategia TopK-Drop com:
 
-- **Universo pequeno e liquidez irregular.** A B3 tem ~400 papeis com liquidez razoavel contra 3.000+ nos EUA. A cross-section muda de tamanho por data.
-- **Regimes macroeconomicos volateis.** Selic saindo de 2% para 14,75%, dois choques cambiais, pandemia e ciclos eleitorais comprimem e esticam premios de risco de forma nao estacionaria.
-- **Microestrutura.** Bid-ask spreads altos e baixa profundidade de book penalizam estrategias de alta rotatividade, tornando crucial modelar incerteza e controlar turnover.
+- `k = 50` acoes em carteira;
+- `n = 5` substituicoes maximas por dia;
+- custo de transacao de `10 bps`;
+- benchmark `EW Market` sobre o mesmo universo.
 
-### O modelo de fatores dinamicos
+## 2. Principais resultados
 
-O FactorVAE adota a formulacao de Dynamic Factor Model como prior estrutural:
+- O FactorVAE foi o melhor modelo em retorno anualizado, com `10.95%` ao ano, levemente abaixo do `EW Market` em retorno em excesso anualizado (`-0.05%`), mas acima de todos os outros sinais alternativos.
+- O sinal do modelo foi o melhor em Rank IC medio (`0.020`) e empatou a melhor leitura de Rank ICIR (`0.118`).
+- A estrategia teve o maior hit rate do conjunto (`50.09%`), mas sem exigir o maior turnover. O turnover medio foi `18.07%`, abaixo de GRU, MLP e Ridge.
+- Entre os benchmarks, o GRU foi o competidor mais forte. Ele ficou mais proximo do benchmark em retorno e teve Rank ICIR igual ao do FactorVAE, mas ainda perdeu em retorno final e em hit rate.
+- Momentum e Ridge ficaram claramente atras, tanto em retorno acumulado quanto em desempenho ajustado ao risco.
 
-$$y_s = \alpha_s + \sum_{k=1}^{K} \beta_s^{(k)} \, z_s^{(k)} + \epsilon_s$$
+## 3. Figuras
 
-onde:
-- $y_s \in \mathbb{R}^{N_s}$ — retornos observados na cross-section da data $s$
-- $\alpha_s \in \mathbb{R}^{N_s}$ — retornos idiossincraticos (ruido de cada ativo)
-- $\beta_s \in \mathbb{R}^{N_s \times K}$ — exposicoes aos fatores (cargas, dinamicas por data)
-- $z_s \in \mathbb{R}^K$ — fatores latentes do mercado na data $s$
-- $\epsilon_s$ — ruido de media zero
+### Diagnostico de treino
 
-A contribuicao do FactorVAE e tratar $z_s$ como **variavel aleatoria gaussiana** inferida via Variational Autoencoder, em vez de estima-la por minimos quadrados como no PCA ou APT classico. Isso permite (a) quantificar incerteza sobre os fatores, (b) aprender representacoes nao-lineares das exposicoes $\beta$ via redes neurais, e (c) separar o que o modelo sabe a priori (a partir de $x$) do que os retornos observados revelam (posterior).
+![Diagnostico de treino](results/figures/TRAIN_training_curves.png)
 
----
+Leitura breve: a perda total e a componente de reconstrucao caem de forma gradual, enquanto o Rank IC de validacao permanece positivo na maior parte do treino. O comportamento sugere aprendizado estavel, sem deterioracao clara fora da amostra de validacao.
 
-## 2. Metodologia
+### Retorno acumulado da estrategia
 
-### 2.1 Dados e features
+![Retorno acumulado da estrategia](results/figures/BKT_cumulative_return.png)
 
-**Universo.** Todas as acoes ordinarias e preferenciais da B3 com historico de pelo menos 60 dias uteis no periodo relevante. O universo valido e recalculado a cada data — tickers com dados faltantes sao excluidos da cross-section daquele dia.
+Leitura breve: o FactorVAE termina o periodo com a maior curva acumulada do grupo, acima do `EW Market` e tambem acima do GRU. A vantagem aparece principalmente do fim de 2023 em diante, quando os modelos lineares e o momentum ficam mais para tras.
 
-**Splits temporais** (sem sobreposicao, sem olhar a frente):
+### Retorno acumulado em excesso vs benchmark
 
-| Split | Periodo | Uso |
-|-------|---------|-----|
-| Treino | 2010-01-01 a 2017-12-31 | Gradiente, normalizacao |
-| Validacao | 2018-01-01 a 2018-12-31 | Early stopping, selecao de hiperparametros |
-| Teste | 2019-01-01 a 2025-12-31 | Todas as metricas reportadas |
+![Retorno acumulado em excesso vs benchmark](results/figures/BKT_cumulative_excess_return.png)
 
-**Features** ($C = 20$ caracteristicas por ativo por dia, janela $T = 20$ dias uteis):
+Leitura breve: contra o benchmark igual-ponderado, o FactorVAE oscila em torno de zero no fim da amostra, mas continua muito acima dos demais benchmarks, que encerram o periodo com excesso acumulado bem negativo. Em outras palavras: o modelo nao gera um alfa folgado contra o benchmark depois de custos, mas ainda domina os sinais alternativos.
 
-Cada feature e calculada como janela estritamente backward a partir da data de predicao, sem uso de dados futuros. O target $y^{(i)}$ e o retorno $(p_{t+2} - p_{t+1})/p_{t+1}$ — o lag de um dia previne look-ahead ao preco de fechamento do dia corrente.
+### Rank IC rolling de 60 dias
 
-**Normalizacao cross-sectional.** A cada data, as features sao normalizadas via z-score transversal (media e desvio dos tickers daquela data). Nenhuma estatistica do treino vaza para validacao ou teste.
+![Rank IC rolling](results/figures/RIC_rolling_rank_ic.png)
 
-### 2.2 Arquitetura do modelo
+Leitura breve: o Rank IC do FactorVAE e positivo em boa parte da amostra, mas sem superioridade estatica e limpa em todas as janelas. O diferencial do modelo parece vir menos de um IC muito acima do resto em todo instante e mais da combinacao entre sinal competitivo, melhor conversao em carteira e menor degradacao economica que os benchmarks piores.
 
-O modelo encadeia quatro redes em torno de um **embedding compartilhado** $e \in \mathbb{R}^{N \times H}$:
+## 4. Tabelas comparativas
 
-| Modulo | Simbolo | Entrada | Saida | Quando opera |
-|--------|---------|---------|-------|--------------|
-| Feature Extractor | $\phi_\text{feat}$ | $x \in \mathbb{R}^{N \times T \times C}$ | $e \in \mathbb{R}^{N \times H}$ | Sempre |
-| Factor Encoder | $\phi_\text{enc}$ | $(y, e)$ | $(\mu_\text{post}, \sigma_\text{post}) \in \mathbb{R}^K$ | Apenas no treino |
-| Factor Predictor | $\phi_\text{pred}$ | $e$ | $(\mu_\text{prior}, \sigma_\text{prior}) \in \mathbb{R}^K$ | Treino e inferencia |
-| Factor Decoder | $\phi_\text{dec}$ | $(\mu_z, \sigma_z, e)$ | $(\mu_y, \sigma_y) \in \mathbb{R}^N$ | Treino e inferencia |
+Os arquivos PNG de comparacao continuam em `results/figures`, mas abaixo as mesmas informacoes sao apresentadas em Markdown.
 
-#### Feature Extractor
+### Qualidade do sinal preditivo
 
-Uma projecao linear com LeakyReLU seguida de GRU acumula contexto temporal. O embedding $e^{(i)} = h_\text{GRU}^{(i,T)}$ — o hidden state do ultimo passo — resume os $T$ dias de historico de cada ativo:
+| Modelo | Rank IC | Rank ICIR |
+|-------|-------:|----------:|
+| FactorVAE | +0.020 | +0.118 |
+| Momentum | +0.006 | +0.037 |
+| Linear (Ridge) | +0.005 | +0.037 |
+| MLP | +0.010 | +0.071 |
+| GRU | +0.016 | +0.118 |
 
-$$h_\text{proj}^{(i,t)} = \text{LeakyReLU}(W_\text{proj}\, x^{(i,t)} + b_\text{proj}), \qquad e^{(i)} = \text{GRU}(h_\text{proj}^{(i,\cdot)})_T$$
+Interpretacao breve: o FactorVAE lidera em Rank IC e divide a melhor leitura de Rank ICIR com o GRU. O ganho do modelo nao vem de um salto gigantesco na correlacao media, e sim de uma melhora consistente sobre os modelos mais simples e de uma traducao melhor desse sinal para performance de carteira.
 
-Os pesos sao compartilhados entre todos os $N$ tickers — a mesma rede processa cada ativo independentemente.
+### Performance ajustada ao risco
 
-#### Factor Encoder (oraculo de treino)
+| Modelo | Ret. Anual | Retorno Exc. | Volatil. | Sharpe | IR | Calmar | Max DD |
+|-------|-----------:|-------------:|---------:|-------:|---:|-------:|-------:|
+| FactorVAE | +10.95% | -0.05% | +22.79% | -0.007 | -0.007 | -0.003 | +18.72% |
+| EW Market | +11.01% | +0.00% | +26.52% | +0.000 | +0.000 | +0.000 | +0.00% |
+| Momentum | +6.37% | -4.63% | +24.59% | -0.596 | -0.596 | -0.121 | +38.33% |
+| Linear (Ridge) | +4.30% | -6.71% | +27.11% | -1.102 | -1.102 | -0.167 | +40.15% |
+| MLP | +7.80% | -3.20% | +26.80% | -0.544 | -0.544 | -0.123 | +26.08% |
+| GRU | +9.49% | -1.52% | +24.64% | -0.268 | -0.268 | -0.085 | +17.95% |
 
-O encoder usa $y$ observado (informacao futura) para inferir a distribuicao *posterior* dos fatores. Opera apenas durante o treino — e o "professor" que o predictor aprende a imitar.
+Interpretacao breve: o FactorVAE foi o melhor modelo entre os sinais concorrentes em retorno anualizado e tambem um dos melhores em controle de drawdown. O ponto que limita a leitura economica e que, frente ao `EW Market`, o retorno em excesso anualizado ficou praticamente nulo. Ainda assim, contra os benchmarks de modelagem, ele foi claramente superior.
 
-Internamente, constroi $M$ portfolios dinamicos cujos pesos dependem dos embeddings:
+### Metricas operacionais da estrategia
 
-$$a_p^{(i,j)} = \frac{\exp(W_p e^{(i)})^{(j)}}{\sum_{i'} \exp(W_p e^{(i')})^{(j)}}, \qquad y_p^{(j)} = \sum_i y^{(i)} a_p^{(i,j)}$$
+| Modelo | Hit Rate | Turnover |
+|-------|---------:|---------:|
+| FactorVAE | +50.09% | +18.07% |
+| Momentum | +48.65% | +9.29% |
+| Linear (Ridge) | +45.55% | +32.81% |
+| MLP | +47.45% | +31.16% |
+| GRU | +48.19% | +25.10% |
 
-Esse passo reduz a dimensao variavel $N \to M$ fixo, tornando o encoder invariante ao tamanho da cross-section. Os $M$ retornos de portfolio sao mapeados para os parametros da posterior via camadas lineares com Softplus nas variancias.
+Interpretacao breve: o FactorVAE foi o unico modelo acima de 50% de hit rate e nao exigiu o turnover extremo de Ridge, MLP ou mesmo GRU. Isso ajuda a explicar por que um ganho moderado em qualidade de sinal se converteu em melhor resultado final de carteira.
 
-#### Factor Predictor (inferencia)
-
-O predictor nao ve $y$. Ele usa **Multi-Head Global Attention** para agregar informacao dos $N$ ativos em $K$ representacoes globais do mercado:
-
-$$a_\text{att}^{(i)} \propto \max\!\left(0,\; \frac{q \cdot k^{(i)}}{\|q\|_2 \|k^{(i)}\|_2}\right), \qquad h_\text{muti}^{(k)} = \sum_i a_\text{att}^{(i)} v^{(i)}$$
-
-O query $q \in \mathbb{R}^H$ e um parametro aprendivel — cada uma das $K$ heads aprende a "perguntar" algo diferente ao mercado. A similaridade cosseno com ReLU (em vez do softmax padrao de Transformers) zera scores negativos e normaliza apenas pelos positivos, produzindo atencao esparsa.
-
-#### Factor Decoder
-
-O decoder converte a distribuicao de fatores $(\mu_z, \sigma_z)$ em distribuicao de retornos por composicao analitica — **sem amostrar**:
-
-$$\mu_y^{(i)} = \mu_\alpha^{(i)} + \sum_k \beta^{(i,k)} \mu_z^{(k)}$$
-
-$$\sigma_y^{(i)} = \sqrt{(\sigma_\alpha^{(i)})^2 + \sum_k (\beta^{(i,k)})^2 (\sigma_z^{(k)})^2}$$
-
-onde $(\mu_\alpha, \sigma_\alpha)$ vem de uma rede sobre $e$ (retorno idiossincratico por ativo), e $\beta$ e uma projecao linear de $e$ sobre $\mathbb{R}^K$ (exposicoes fatoriais). Como tudo e gaussiano e independente, a soma e fechada — nenhum Monte Carlo e necessario. A variancia preditiva $\sigma_y^{(i)}$ tem interpretacao estrutural: decompoem-se em componente idiossincrática e componente fatorial.
-
-### 2.3 Funcao objetivo
-
-$$\mathcal{L}(x, y) = \underbrace{-\frac{1}{N}\sum_i \log \mathcal{N}(y^{(i)};\, \mu_y^{(i)}, \sigma_y^{(i)})}_{\text{reconstrucao (NLL)}} + \;\gamma\; \underbrace{\text{KL}\!\left(q_\text{enc}(z|x,y) \;\|\; p_\text{pred}(z|x)\right)}_{\text{regularizacao}}$$
-
-A reconstrucao usa sempre a **posterior** (o encoder enxerga $y$). O KL empurra o predictor para imitar o encoder. Ambos os termos sao computaveis em forma fechada — sem reparameterization trick ou Monte Carlo na loss.
-
-O KL entre duas gaussianas diagonais e:
-
-$$\text{KL}(\mathcal{N}(\mu_q, \sigma_q^2) \| \mathcal{N}(\mu_p, \sigma_p^2)) = \log\frac{\sigma_p}{\sigma_q} + \frac{\sigma_q^2 + (\mu_q - \mu_p)^2}{2\sigma_p^2} - \frac{1}{2}$$
-
-somado sobre os $K$ fatores independentes.
-
-**Hiperparametros** (valores usados neste experimento):
-
-| Parametro | Valor | Descricao |
-|-----------|-------|-----------|
-| $H$ | 20 | Dimensao do embedding |
-| $K$ | 8 | Numero de fatores latentes |
-| $M$ | 64 | Numero de portfolios do encoder |
-| $T$ | 20 | Janela temporal (dias uteis) |
-| $\gamma$ | 1.0 | Peso do KL |
-| lr | 1e-3 | Taxa de aprendizado (Adam) |
-| epocas | 10 | Epocas de treino |
-
-### 2.4 Estrategia de portfolio
-
-A avaliacao usa a estrategia **TopK-Drop** com controle de turnover:
-
-1. **Sinal:** rankear todos os ativos por $\mu_\text{pred}^{(i)}$ na data $t$.
-2. **Top-K:** manter os $k = 50$ mais bem ranqueados em carteira, pesos iguais.
-3. **Restricao de turnover:** substituir no maximo $n = 5$ ativos por dia.
-4. **Custo de transacao:** 10 bps por operacao (compra e venda).
-5. **Benchmark:** mercado igual-ponderado (EW Market) sobre o mesmo universo.
-
-O controle de turnover e motivado pela microestrutura da B3: alta rotatividade em acoes iliquidas pode consumir todo o alfa em spread e impacto de mercado.
-
----
-
-## 3. Resultados
-
-Periodo de teste: **2019-01-01 a 2025-12-31** (7 anos fora da amostra de treino e validacao).
-
-### Retorno acumulado em excesso
-
-![Retorno acumulado em excesso vs benchmark](results/figures/cumulative_excess_return.png)
-
-O alfa acumulado do FactorVAE e positivo durante todo o periodo de teste. Os quatro benchmarks alternativos perdem consistentemente para o mercado. A separacao se torna mais clara apos 2022, sugerindo que a estrutura fatorial captura algo sobre o regime pos-pandemia na B3 — possivelmente a maior dispersao setorial e a rotacao entre value e growth.
-
-### Retorno acumulado
-
-![Retorno acumulado — estrategia TopK-Drop](results/figures/cumulative_return.png)
-
-O FactorVAE entrega retorno acumulado de ~86% no periodo (vs. ~62% do EW Market). O EW Market (cinza solido) serve de referencia de buy-and-hold. O GRU puro fica proximo do mercado, confirmando que a sequencia temporal ajuda — mas a estrutura VAE fatorial adiciona o salto final.
-
-### Qualidade do sinal preditivo (Rank IC rolling)
-
-![IC de Spearman — rolling 60 dias](results/figures/rolling_rank_ic.png)
-
-O FactorVAE (vermelho) tem IC medio de 0.027, acima de todos os benchmarks. O GRU puro (0.013) e o segundo melhor, confirmando que a estrutura temporal agrega valor mesmo sem a componente probabilistica fatorial. O IC do FactorVAE e mais estavel e frequentemente positivo em periodos em que os benchmarks ficam negativos.
-
-### Tabelas comparativas
-
-![Qualidade do sinal preditivo](results/figures/comparison_ic.png)
-
-![Performance ajustada ao risco](results/figures/comparison_performance.png)
-
-![Metricas da estrategia](results/figures/comparison_strategy.png)
-
-**Leitura dos resultados:**
-
-- **FactorVAE e o unico modelo com Sharpe positivo (+0.081)** no periodo de 7 anos fora da amostra.
-- O **EW Market** serve de referencia de buy-and-hold: retorno anualizado de ~11%, Sharpe zero por definicao (e o proprio benchmark). Nenhum benchmark bate o mercado.
-- **GRU puro** (+7.0% anual, Sharpe -0.718) supera os modelos estaticos (MLP, Ridge, Momentum), validando que a estrutura temporal e util — mas a componente VAE fatorial e o que gera alfa real.
-- **Hit rate de 50.3%** do FactorVAE vs 48-49% dos demais indica que o ganho vem de acertar quando importa (magnitude de retorno), nao de frequencia bruta de acerto.
-- **Turnover de apenas 11.2%** (5 trocas/dia sobre 50 posicoes) mostra que a estrategia e implementavel na B3 sem consumir o alfa em custos.
-
----
-
-## 4. Como reproduzir
+## 5. Como reproduzir
 
 ### Instalacao
 
@@ -204,85 +112,48 @@ O FactorVAE (vermelho) tem IC medio de 0.027, acima de todos os benchmarks. O GR
 pip install -e .
 ```
 
-### Pipeline completo
+### Pipeline principal
 
 ```bash
-# 1. Processar features brutas -> parquets em data/processed/
+# 1. Construir base processada
 python scripts/build_features.py
 
 # 2. Treinar o modelo
 python scripts/train.py
 
-# 3. Inferencia + backtest + figuras
+# 3. Gerar predicoes e avaliar o FactorVAE
 python scripts/evaluate.py
 
-# 4. Benchmarks (Momentum, Ridge, MLP, GRU)
+# 4. Rodar benchmarks
 python benchmarks/run_benchmarks.py
 
-# 5. Regenerar apenas figuras/tabelas (se predicoes ja existem)
+# 5. Regenerar figuras e tabelas comparativas
 python scripts/backtest.py
 ```
 
-### Suite de testes
+### Testes
 
 ```bash
-pytest tests/ -q    # 79 testes, ~74 s
+pytest tests/ -q
 ```
 
----
+## 6. Estrutura do repositorio
 
-## 5. Estrutura do repositorio
-
-```
+```text
 FactorVAE/
-|-- config.yaml                   # Hiperparametros e splits temporais
-|
-|-- src/factorvae/
-|   |-- data/
-|   |   |-- dataset.py            # RealDataset: tensores por data
-|   |   `-- datamodule.py         # LightningDataModule + MacroNormalizer
-|   |-- models/
-|   |   |-- feature_extractor.py  # GRU encoder temporal
-|   |   |-- factor_encoder.py     # Portfolio Layer + Mapping Layer
-|   |   |-- factor_predictor.py   # Multi-Head Global Attention
-|   |   |-- factor_decoder.py     # Alpha + Beta + composicao analitica
-|   |   `-- factorvae.py          # Modulo raiz: forward_train / forward_predict
-|   |-- training/
-|   |   |-- lightning_module.py   # Loop de treino/val Lightning
-|   |   `-- losses.py             # NLL + KL analitico
-|   `-- evaluation/
-|       |-- backtest.py           # TopK-Drop, metricas de performance
-|       |-- comparison.py         # Tabela comparativa multi-modelo
-|       |-- metrics.py            # Rank IC, Rank ICIR, rolling IC
-|       |-- plot_style.py         # Tema visual (Cambria, paleta Insper)
-|       `-- plot_table.py         # Renderizador de tabelas PNG
-|
+|-- config.yaml
+|-- README.md
 |-- benchmarks/
-|   |-- momentum.py               # Feature ret_20d puro
-|   |-- linear_model.py           # Ridge sobre features do ultimo dia
-|   |-- mlp.py                    # MLP 2 camadas, ultimo timestep
-|   |-- gru.py                    # GRU puro sem VAE
-|   `-- run_benchmarks.py         # Roda todos e salva parquets
-|
-|-- scripts/
-|   |-- train.py                  # Treino com PyTorch Lightning
-|   |-- evaluate.py               # Inferencia -> predicoes -> backtest
-|   `-- backtest.py               # Backtest standalone + figuras
-|
 |-- data/
-|   |-- processed/                # features.parquet, returns.parquet, etc.
-|   `-- raw/                      # Dados brutos (nao versionados)
-|
 |-- results/
-|   |-- checkpoints/              # best.ckpt, last.ckpt
-|   |-- predictions/              # predictions.parquet
-|   `-- figures/                  # PNGs gerados pelo backtest
-|
-`-- tests/                        # 79 testes unitarios e de integracao
+|   |-- checkpoints/
+|   |-- predictions/
+|   `-- figures/
+|-- scripts/
+|-- src/factorvae/
+`-- tests/
 ```
-
----
 
 ## Referencia
 
-Duan, S., Zhang, K., Wang, G., & Liu, Q. (2022). **FactorVAE: A Probabilistic Dynamic Factor Model Based on Variational Autoencoder for Predicting Cross-Sectional Stock Returns**. *Proceedings of the AAAI Conference on Artificial Intelligence*, 36(4), 4468-4476.
+Duan, S., Zhang, K., Wang, G., & Liu, Q. (2022). FactorVAE: A Probabilistic Dynamic Factor Model Based on Variational Autoencoder for Predicting Cross-Sectional Stock Returns. Proceedings of the AAAI Conference on Artificial Intelligence, 36(4), 4468-4476.
