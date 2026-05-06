@@ -163,7 +163,7 @@ def robustness_holdout_train_test(
     from tqdm import tqdm as _tqdm
 
     from factorvae.data.dataset import RealDataset
-    from factorvae.data.datamodule import FactorVAEDataModule, MacroNormalizer
+    from factorvae.data.datamodule import FactorVAEDataModule
     from factorvae.models.factorvae import FactorVAE
     from factorvae.training.lightning_module import FactorVAELightning
     from factorvae.utils.seeding import seed_everything
@@ -173,7 +173,6 @@ def robustness_holdout_train_test(
     tc    = config["training"]
     pdir  = Path(dc["processed_dir"])
 
-    use_macro = dc.get("use_macro", False)
     max_epochs = max_epochs_override if max_epochs_override is not None else tc["max_epochs"]
 
     # ── Discover full training universe ──────────────────────────────────────
@@ -200,22 +199,9 @@ def robustness_holdout_train_test(
             "Reduce m to leave at least 1 ticker for training."
         )
 
-    # ── Build macro normalizer once (if needed) ───────────────────────────────
-    macro_normalizer: "MacroNormalizer | None" = None
-    if use_macro:
-        macro_wide = (
-            pd.read_parquet(pdir / "macro.parquet")
-            .assign(date=lambda df: pd.to_datetime(df["date"]))
-            .pivot(index="date", columns="feature_name", values="value")
-            .sort_index()
-            .ffill()
-        )
-        macro_normalizer = MacroNormalizer(macro_wide, dc["train_start"], dc["train_end"])
-
     # ── Build val/test datasets (shared across all trials — no holdout) ───────
-    ds_kwargs = {"use_macro": use_macro, "macro_normalizer": macro_normalizer}
-    val_ds  = RealDataset(pdir, dc["val_start"],  dc["val_end"],  dc["sequence_length"], **ds_kwargs)
-    test_ds = RealDataset(pdir, dc["test_start"], dc["test_end"], dc["sequence_length"], **ds_kwargs)
+    val_ds  = RealDataset(pdir, dc["val_start"],  dc["val_end"],  dc["sequence_length"])
+    test_ds = RealDataset(pdir, dc["test_start"], dc["test_end"], dc["sequence_length"])
     val_dl  = DataLoader(val_ds,  batch_size=1, shuffle=False, num_workers=0)
     test_dl = DataLoader(test_ds, batch_size=1, shuffle=False, num_workers=0)
 
@@ -237,7 +223,6 @@ def robustness_holdout_train_test(
         train_ds = RealDataset(
             pdir, dc["train_start"], dc["train_end"], dc["sequence_length"],
             exclude_tickers=held_out,
-            **ds_kwargs,
         )
         train_dl = DataLoader(train_ds, batch_size=1, shuffle=True, num_workers=0)
 

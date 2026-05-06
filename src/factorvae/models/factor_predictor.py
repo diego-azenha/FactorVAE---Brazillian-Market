@@ -105,43 +105,22 @@ class FactorPredictor(nn.Module):
     K independent attention heads produce h_muti in (K, H).
     Shared DistributionNetwork maps each head to (mu_k, sigma_k).
 
-    Optional macro conditioning: when macro_dim > 0, a linear projection of
-    the macro vector m (macro_dim,) is concatenated to each head's representation
-    before the DistributionNetwork, doubling the input size to (K, 2H).
     """
 
-    def __init__(self, hidden_dim: int, num_factors: int, leaky_slope: float = 0.1,
-                 macro_dim: int = 0):
+    def __init__(self, hidden_dim: int, num_factors: int, leaky_slope: float = 0.1):
         super().__init__()
         self.heads = nn.ModuleList(
             [SingleHeadAttention(hidden_dim) for _ in range(num_factors)]
         )
-        self.macro_dim = macro_dim
-        if macro_dim > 0:
-            self.macro_proj = nn.Sequential(
-                nn.Linear(macro_dim, hidden_dim),
-                nn.LeakyReLU(leaky_slope),
-            )
-            dist_in = hidden_dim * 2
-        else:
-            self.macro_proj = None
-            dist_in = hidden_dim
+        self.dist_net = DistributionNetwork(hidden_dim, leaky_slope)
 
-        self.dist_net = DistributionNetwork(dist_in, leaky_slope)
-
-    def forward(self, e: Tensor, m: Tensor | None = None) -> tuple[Tensor, Tensor]:
+    def forward(self, e: Tensor) -> tuple[Tensor, Tensor]:
         """
         Args:
             e: (N, H) stock embeddings
-            m: (macro_dim,) optional macro vector — required when macro_dim > 0
         Returns:
             mu_prior:    (K,)
             sigma_prior: (K,)
         """
         h_muti = torch.stack([head(e) for head in self.heads], dim=0)  # (K, H)
-        if self.macro_proj is not None:
-            assert m is not None, "macro_dim > 0 mas m não foi passado"
-            m_proj = self.macro_proj(m)                                  # (H,)
-            m_proj_expanded = m_proj.unsqueeze(0).expand(h_muti.size(0), -1)
-            h_muti = torch.cat([h_muti, m_proj_expanded], dim=-1)        # (K, 2H)
         return self.dist_net(h_muti)
