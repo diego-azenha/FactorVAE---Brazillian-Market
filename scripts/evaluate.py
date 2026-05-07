@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import datetime
 from pathlib import Path
 
 # Ensure the project root is on sys.path so `scripts.backtest` is importable
@@ -39,6 +40,7 @@ from factorvae.training.lightning_module import FactorVAELightning
 from factorvae.evaluation.metrics import compute_rank_ic, compute_rank_icir
 from factorvae.evaluation.robustness import robustness_drop_test
 from factorvae.utils.seeding import seed_everything
+from factorvae.utils.checkpoints import resolve_checkpoint
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -64,9 +66,31 @@ def main() -> None:
         help="Skip the robustness drop test.",
     )
     args = parser.parse_args()
+    args.checkpoint = resolve_checkpoint(args.checkpoint)
 
     with open(args.config) as f:
         config = yaml.safe_load(f)
+
+    # ── Build run directory ───────────────────────────────────────────────────
+    ckpt_stem = Path(args.checkpoint).stem.replace("=", "-")
+    run_ts    = datetime.now().strftime("%m%d_%H%M")
+    cfg_d, cfg_m, cfg_e = config["data"], config["model"], config["evaluation"]
+    run_name = (
+        f"{run_ts}__{ckpt_stem}"
+        f"__test{cfg_d['test_start'][:4]}-{cfg_d['test_end'][:4]}"
+        f"_K{cfg_m['num_factors']}_T{cfg_d['sequence_length']}_top{cfg_e['top_k']}"
+    )
+    run_dir = ROOT / "results" / "runs" / run_name
+    run_dir.mkdir(parents=True, exist_ok=True)
+    print(f"\nRun directory: {run_dir.relative_to(ROOT)}")
+
+    run_info = {
+        "timestamp":  datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "checkpoint": Path(args.checkpoint).name,
+        "config":     config,
+    }
+    with open(run_dir / "run_info.yaml", "w") as _f:
+        yaml.dump(run_info, _f, default_flow_style=False, allow_unicode=True)
 
     seed_everything(config["training"]["seed"])
 
@@ -142,10 +166,14 @@ def main() -> None:
             rank_ics.append(compute_rank_ic(y, mu_pred))
 
     out_df = pd.DataFrame(records)
-    out_path = ROOT / "results" / "predictions" / "predictions.parquet"
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_df.to_parquet(out_path, index=False)
-    print(f"Saved {len(out_df)} rows to {out_path}")
+    # Write to run-specific dir
+    run_preds_path = run_dir / "predictions.parquet"
+    out_df.to_parquet(run_preds_path, index=False)
+    # Also write to legacy location for standalone scripts/backtest.py
+    legacy_path = ROOT / "results" / "predictions" / "predictions.parquet"
+    legacy_path.parent.mkdir(parents=True, exist_ok=True)
+    out_df.to_parquet(legacy_path, index=False)
+    print(f"Saved {len(out_df)} rows → {run_preds_path.relative_to(ROOT)}")
 
     print(f"Test Rank IC:   {sum(rank_ics)/len(rank_ics):.4f}")
     print(f"Test Rank ICIR: {compute_rank_icir(rank_ics):.4f}")
@@ -174,6 +202,7 @@ def main() -> None:
             config=config,
             root=ROOT,
             benchmark_path=Path(args.benchmark),
+            out_dir=run_dir,
         )
 
 

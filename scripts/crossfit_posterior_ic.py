@@ -62,6 +62,7 @@ from factorvae.evaluation.metrics import compute_rank_ic
 from factorvae.models.factorvae import FactorVAE
 from factorvae.training.lightning_module import FactorVAELightning
 from factorvae.utils.seeding import seed_everything
+from factorvae.utils.checkpoints import resolve_checkpoint
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -93,6 +94,7 @@ def main() -> None:
     parser.add_argument("--checkpoint", default=str(ROOT / "results" / "checkpoints" / "best.ckpt"))
     parser.add_argument("--split",      default="test", choices=["val", "test"])
     args = parser.parse_args()
+    args.checkpoint = resolve_checkpoint(args.checkpoint)
 
     with open(args.config) as f:
         config = yaml.safe_load(f)

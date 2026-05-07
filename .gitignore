@@ -22,8 +22,8 @@ data/raw/
 data/processed/
 
 # Results
-results/checkpoints/
 results/predictions/
+results/runs/**/*.parquet
 
 # Jupyter
 .ipynb_checkpoints/

@@ -10,6 +10,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 from pathlib import Path
 
 import torch
@@ -78,15 +79,16 @@ def main() -> None:
         RichProgressBar(),
         ModelCheckpoint(
             dirpath=str(ROOT / "results" / "checkpoints"),
-            filename="best",
+            filename=datetime.now().strftime("%m%d_%H%M") + "_{val_rank_ic:.4f}",
             monitor="val_rank_ic",
             mode="max",
-            save_last=True,
+            save_last=False,
+            save_top_k=1,
         ),
         EarlyStopping(
             monitor="val_rank_ic",
             mode="max",
-            patience=10,
+            patience=15,
             verbose=True,
         ),
     ]

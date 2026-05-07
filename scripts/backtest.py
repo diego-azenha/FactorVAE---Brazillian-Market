@@ -20,6 +20,8 @@ from pathlib import Path
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+import numpy as np
 import pandas as pd
 import yaml
 
@@ -34,7 +36,7 @@ from factorvae.evaluation.comparison import (
 from factorvae.evaluation.metrics import rolling_rank_ic
 from factorvae.evaluation.plot_style import (
     PALETTE, TEXT_SECONDARY,
-    add_brand_bar, add_footer, add_title, apply_style, finalize_axes, label_lines,
+    apply_style, finalize_axes,
 )
 from factorvae.evaluation.plot_table import render_comparison_table
 
@@ -64,6 +66,7 @@ def run_backtest_from_predictions(
     config: dict,
     root: Path,
     benchmark_path: "Path | None" = None,
+    out_dir: "Path | None" = None,
 ) -> None:
     """
     Full backtest: metrics table + three figures.
@@ -73,6 +76,8 @@ def run_backtest_from_predictions(
         config:         parsed config.yaml dict.
         root:           workspace root for locating benchmark parquets + output dirs.
         benchmark_path: path to benchmark return parquet; falls back to EW market.
+        out_dir:        directory for all outputs (figures, CSV). Defaults to
+                        results/figures/ for backward compatibility.
     """
     apply_style()
 
@@ -92,9 +97,10 @@ def run_backtest_from_predictions(
         all_preds["FactorVAE"] = factorvaepreds
 
     # ── Comparison table ──────────────────────────────────────────────────────
-    table = build_comparison_table(root, benchmark, k=k, n=n, eta=0.0)
+    rf = config.get("evaluation", {}).get("risk_free_rate", 0.10)
+    table = build_comparison_table(root, benchmark, k=k, n=n, eta=0.0, risk_free_rate=rf)
 
-    fig_dir = root / "results" / "figures"
+    fig_dir = out_dir if out_dir is not None else root / "results" / "figures"
     fig_dir.mkdir(parents=True, exist_ok=True)
 
     csv_path = fig_dir / "comparison_table.csv"
@@ -106,7 +112,8 @@ def run_backtest_from_predictions(
     # ── Render three styled comparison table PNGs ─────────────────────────────
     # Add EW Market row to performance table (buy-and-hold baseline)
     _ew_turn  = pd.Series(0.0, index=benchmark.index)
-    _ew_perf  = compute_performance_metrics(benchmark, benchmark, turnover=_ew_turn)
+    _ew_perf  = compute_performance_metrics(benchmark, benchmark, turnover=_ew_turn,
+                                             risk_free_rate=rf)
     _ew_row   = pd.DataFrame(
         {**{"rank_ic": float("nan"), "rank_icir": float("nan")}, **_ew_perf},
         index=["EW Market"],
@@ -138,7 +145,7 @@ def run_backtest_from_predictions(
         return src[present].rename(columns=_PRETTY)
 
     _IC    = ["rank_ic", "rank_icir"]
-    _PERF  = ["annualized_return", "annualized_excess", "volatility",
+    _PERF  = ["annualized_return", "volatility",
                "sharpe", "information_ratio", "calmar", "max_drawdown"]
     _STRAT = ["hit_rate", "avg_turnover"]
 
@@ -196,79 +203,96 @@ def run_backtest_from_predictions(
 
     # ── Figure 1: Retorno acumulado ───────────────────────────────────────────
     fig1, ax1 = plt.subplots(figsize=(11, 5.5))
-    fig1.subplots_adjust(top=0.84, bottom=0.12, left=0.06, right=0.90)
+    fig1.subplots_adjust(top=0.87, bottom=0.12, left=0.08, right=0.97)
 
     cum_series: dict[str, pd.Series] = {}
     for name, ret in port_series.items():
         color = COLOR_MAP.get(name, PALETTE[-1])
-        cum = (1.0 + ret).cumprod()
-        ax1.plot(cum.index, cum.values, color=color)
-        cum_series[name] = cum
+        wealth = (1.0 + ret.fillna(0.0)).cumprod()
+        ax1.plot(wealth.index, wealth.values, color=color, label=name)
+        cum_series[name] = wealth
 
-    cum_bm = (1.0 + bm_aligned).cumprod()
-    ax1.plot(cum_bm.index, cum_bm.values, color=TEXT_SECONDARY, linestyle="-", linewidth=0.7)
-    cum_series[label_bm] = cum_bm
+    bm_wealth = (1.0 + bm_aligned.fillna(0.0)).cumprod()
+    ax1.plot(bm_wealth.index, bm_wealth.values, color=TEXT_SECONDARY,
+             linestyle="-", linewidth=0.7, label=label_bm)
+    cum_series[label_bm] = bm_wealth
 
-    label_lines(ax1, cum_series, color_map={**COLOR_MAP, label_bm: TEXT_SECONDARY})
+    ax1.set_yscale("log")
+    ax1.yaxis.set_major_locator(mticker.LogLocator(base=10.0, subs=[1.0, 2.0, 3.0, 5.0]))
+    ax1.yaxis.set_major_formatter(mticker.FuncFormatter(lambda y, _: f"{y:g}"))
+    ax1.yaxis.set_minor_locator(mticker.NullLocator())
+    ax1.yaxis.grid(True)
+    ax1.xaxis.grid(False)
+    ax1.set_ylabel("Retorno acumulado (base 1, escala log)")
+    ax1.set_title(
+        f"Retorno acumulado — estratégia TopK-Drop\n"
+        f"k={k} ações, turnover máx. n={n}/dia, taxa 10 bps · universo B3",
+        fontsize=12, fontweight="bold", loc="left", pad=8,
+    )
+    ax1.legend(frameon=False, fontsize=9)
     finalize_axes(ax1, y_right=False)
     _date_axis(ax1)
-    ax1.set_ylabel("Retorno acumulado (1 = início)")
-
-    add_brand_bar(fig1)
-    add_title(fig1, "Retorno acumulado — estratégia TopK-Drop",
-              subtitle=f"k={k} ações, turnover máx. n={n}/dia, taxa 10 bps · universo B3")
-    add_footer(fig1, source="Economatica. Cálculos do autor")
+    fig1.text(0.08, 0.02, "Fonte: Economatica. Cálculos do autor",
+              fontsize=8, color=TEXT_SECONDARY, style="italic")
     fig1.savefig(fig_dir / "BKT_cumulative_return.png")
     plt.close(fig1)
     print("Figure saved → results/figures/BKT_cumulative_return.png")
 
     # ── Figure 2: Retorno acumulado em excesso ────────────────────────────────
     fig2, ax2 = plt.subplots(figsize=(11, 5.5))
-    fig2.subplots_adjust(top=0.84, bottom=0.12, left=0.06, right=0.90)
+    fig2.subplots_adjust(top=0.87, bottom=0.12, left=0.08, right=0.97)
 
     excess_series: dict[str, pd.Series] = {}
     for name, ret in port_series.items():
         color = COLOR_MAP.get(name, PALETTE[-1])
-        excess = ret - benchmark.reindex(ret.index).fillna(0.0)
-        cum_ex = (1.0 + excess).cumprod() - 1.0
-        ax2.plot(cum_ex.index, cum_ex.values * 100.0, color=color)
-        excess_series[name] = cum_ex * 100.0
+        bm_ret = benchmark.reindex(ret.index).fillna(0.0)
+        log_excess = np.log1p(ret).cumsum() - np.log1p(bm_ret).cumsum()
+        ax2.plot(log_excess.index, log_excess.values * 100.0, color=color, label=name)
+        excess_series[name] = log_excess * 100.0
 
     ax2.axhline(0, color=TEXT_SECONDARY, linewidth=0.6, linestyle="--")
-    label_lines(ax2, excess_series, color_map=COLOR_MAP)
+    ax2.yaxis.grid(True)
+    ax2.xaxis.grid(False)
+    ax2.set_ylabel("Log-retorno acumulado em excesso vs benchmark (p.p.)")
+    ax2.set_title(
+        f"Retorno acumulado em excesso vs benchmark\n"
+        f"TopK-Drop k={k}, n={n} · universo B3",
+        fontsize=12, fontweight="bold", loc="left", pad=8,
+    )
+    ax2.legend(frameon=False, fontsize=9)
     finalize_axes(ax2, y_right=False)
     _date_axis(ax2)
-    ax2.set_ylabel("Retorno acumulado em excesso (%)")
-
-    add_brand_bar(fig2)
-    add_title(fig2, "Retorno acumulado em excesso vs benchmark",
-              subtitle=f"TopK-Drop k={k}, n={n} · universo B3")
-    add_footer(fig2, source="Economatica. Cálculos do autor")
+    fig2.text(0.08, 0.02, "Fonte: Economatica. Cálculos do autor",
+              fontsize=8, color=TEXT_SECONDARY, style="italic")
     fig2.savefig(fig_dir / "BKT_cumulative_excess_return.png")
     plt.close(fig2)
     print("Figure saved → results/figures/BKT_cumulative_excess_return.png")
 
     # ── Figure 3: Rolling 60-day Rank IC ──────────────────────────────────────
     fig3, ax3 = plt.subplots(figsize=(11, 4.5))
-    fig3.subplots_adjust(top=0.84, bottom=0.12, left=0.06, right=0.90)
+    fig3.subplots_adjust(top=0.87, bottom=0.12, left=0.08, right=0.97)
 
     ic_series: dict[str, pd.Series] = {}
     for name, preds in all_preds.items():
         color = COLOR_MAP.get(name, PALETTE[-1])
         r = rolling_rank_ic(preds, window=60)
-        ax3.plot(r.index, r.values, color=color)
+        ax3.plot(r.index, r.values, color=color, label=name)
         ic_series[name] = r
 
     ax3.axhline(0, color=TEXT_SECONDARY, linewidth=0.6, linestyle="--")
-    label_lines(ax3, ic_series, color_map=COLOR_MAP)
+    ax3.yaxis.grid(True)
+    ax3.xaxis.grid(False)
+    ax3.set_ylabel("IC de Spearman, média 60 dias")
+    ax3.set_title(
+        "IC de Spearman — rolling 60 dias\n"
+        "Correlação cross-sectional entre retorno previsto e realizado",
+        fontsize=12, fontweight="bold", loc="left", pad=8,
+    )
+    ax3.legend(frameon=False, fontsize=9)
     finalize_axes(ax3, y_right=False)
     _date_axis(ax3)
-    ax3.set_ylabel("IC de Spearman, média 60 dias")
-
-    add_brand_bar(fig3)
-    add_title(fig3, "IC de Spearman — rolling 60 dias",
-              subtitle="Correlação cross-sectional entre retorno previsto e realizado")
-    add_footer(fig3, source="Economatica. Cálculos do autor")
+    fig3.text(0.08, 0.02, "Fonte: Economatica. Cálculos do autor",
+              fontsize=8, color=TEXT_SECONDARY, style="italic")
     fig3.savefig(fig_dir / "RIC_rolling_rank_ic.png")
     plt.close(fig3)
     print("Figure saved → results/figures/RIC_rolling_rank_ic.png")

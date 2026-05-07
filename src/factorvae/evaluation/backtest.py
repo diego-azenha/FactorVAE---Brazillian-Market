@@ -80,6 +80,7 @@ def compute_performance_metrics(
     portfolio_returns: pd.Series,
     benchmark_returns: pd.Series,
     turnover: "pd.Series | None" = None,
+    risk_free_rate: float = 0.10,
 ) -> dict:
     """
     Extended performance metrics.
@@ -93,33 +94,38 @@ def compute_performance_metrics(
         annualized_return  : strategy AR (absolute)
         annualized_excess  : AR over benchmark
         volatility         : annualized std of strategy returns
-        sharpe             : SR on excess returns
-        information_ratio  : excess AR / tracking error (identical to sharpe here)
-        max_drawdown       : max peak-to-trough on cumulative excess returns
-        calmar             : annualized_excess / max_drawdown
-        hit_rate           : fraction of days where excess return > 0
+        sharpe             : (annualized_return - risk_free_rate) / volatility
+        risk_free_rate     : annualised risk-free rate used in Sharpe (default 10%)
+        information_ratio  : excess AR / tracking error
+        max_drawdown       : max peak-to-trough on cumulative portfolio returns
+        calmar             : annualized_return / max_drawdown
+        hit_rate           : fraction of days where portfolio return > 0
         avg_turnover       : mean daily turnover (only if turnover is provided)
     """
     bench = benchmark_returns.reindex(portfolio_returns.index).fillna(0.0).values
     port  = portfolio_returns.values
     excess = port - bench
 
+    # Use nanmean/nanstd so that dates with no valid y_true (e.g. last 2 days
+    # of the dataset where forward return is undefined) don't propagate NaN
+    # through all downstream metrics.
     days = 252
-    ann_return = float(np.mean(port) * days)
-    ann_excess = float(np.mean(excess) * days)
-    vol = float(np.std(port, ddof=1) * np.sqrt(days))
+    ann_return = float(np.nanmean(port) * days)
+    ann_excess = float(np.nanmean(excess) * days)
+    vol = float(np.nanstd(port, ddof=1) * np.sqrt(days))
 
-    excess_vol = float(np.std(excess, ddof=1) * np.sqrt(days))
-    sharpe = ann_excess / excess_vol if excess_vol > 1e-9 else 0.0
-    info_ratio = sharpe  # identical under this convention; both reported for clarity
+    excess_vol = float(np.nanstd(excess, ddof=1) * np.sqrt(days))
+    sharpe     = (ann_return - risk_free_rate) / vol if vol > 1e-9 else 0.0
+    info_ratio = ann_excess / excess_vol if excess_vol > 1e-9 else 0.0
 
-    cum_excess  = np.cumprod(1.0 + excess)
-    running_max = np.maximum.accumulate(cum_excess)
-    drawdown    = (running_max - cum_excess) / running_max
+    valid = port[~np.isnan(port)]
+    cum_port    = np.cumprod(1.0 + valid)
+    running_max = np.maximum.accumulate(cum_port)
+    drawdown    = (running_max - cum_port) / running_max
     mdd = float(drawdown.max()) if len(drawdown) > 0 else 0.0
 
-    calmar   = ann_excess / mdd if mdd > 1e-9 else 0.0
-    hit_rate = float(np.mean(excess > 0))
+    calmar   = ann_return / mdd if mdd > 1e-9 else 0.0
+    hit_rate = float(np.nanmean(port > 0))
 
     out = {
         "annualized_return":  ann_return,

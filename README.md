@@ -1,8 +1,159 @@
 # FactorVAE - Mercado Brasileiro (B3)
 
-Implementacao do FactorVAE aplicada a acoes da B3, com foco em previsao cross-sectional de retornos e avaliacao economica via estrategia TopK-Drop.
+Implementação do FactorVAE aplicada a ações da B3, com foco em previsão cross-sectional de retornos e avaliação econômica via estratégia TopK-Drop.
 
-O projeto compara o FactorVAE com benchmarks simples e neurais sobre o periodo de teste de 2019-01-01 a 2025-12-31. O resultado principal da versao atual e direto: o modelo entrega a melhor combinacao entre retorno absoluto, qualidade de sinal e implementabilidade entre os modelos testados, embora o excesso anualizado contra o benchmark igual-ponderado fique praticamente neutro depois de custos.
+O projeto compara o FactorVAE com benchmarks simples e neurais sobre o período de teste de 2019-01-01 a 2026-03-26 (universo de 471 ativos). O resultado principal: o modelo entrega retorno anualizado de **+14,1%**, excesso de **+4,6% a.a.** sobre o benchmark igual-ponderado, e é o único modelo com Sharpe positivo (taxa livre de risco de 10% a.a.) no período.
+
+## Conteúdo
+
+1. Visão geral
+2. Principais resultados
+3. Figuras
+4. Tabelas comparativas
+5. Como reproduzir
+6. Estrutura do repositório
+
+## 1. Visão geral
+
+O FactorVAE combina:
+
+- extrator temporal com GRU para resumir o histórico recente de cada ativo;
+- fatores latentes probabilísticos para modelar o estado do mercado;
+- decoder fatorial para mapear fatores em retornos previstos por ativo;
+- avaliação econômica em carteira, não apenas métricas estatísticas.
+
+O backtest usa uma estratégia TopK-Drop com:
+
+- `k = 50` ações em carteira;
+- `n = 5` substituições máximas por dia;
+- custo de transação de `10 bps` (one-way);
+- benchmark `EW Market` sobre o mesmo universo;
+- Sharpe calculado com taxa livre de risco de **10% a.a.**.
+
+## 2. Principais resultados
+
+- O FactorVAE foi o único modelo com Sharpe positivo (+0,207), retorno anualizado de +14,1% e excesso de +4,6% sobre o EW Market — todos os demais modelos ficaram abaixo do benchmark depois de custos.
+- O sinal do modelo foi o melhor em Rank IC médio (+0,040) e Rank ICIR (+0,246), contra o segundo lugar GRU (+0,025 / +0,217).
+- Hit rate de 52,6% com turnover médio de apenas 14,6% — o menor turnover de qualquer modelo neural, o que favorece a performance líquida de custos.
+- Entre os benchmarks, o GRU foi o competidor mais próximo em qualidade de sinal, mas ainda entregou retorno de apenas +6,1% a.a. com Sharpe negativo (-0,172).
+- Momentum e Ridge ficaram claramente atrás tanto em qualidade de sinal quanto em performance de carteira.
+
+## 3. Figuras
+
+### Diagnóstico de treino
+
+![Diagnóstico de treino](results/figures/TRAIN_training_curves.png)
+
+Leitura breve: a perda total e a componente de reconstrução caem de forma gradual, enquanto o Rank IC de validação permanece positivo e crescente ao longo do treino. O comportamento sugere aprendizado estável, com melhora consistente fora da amostra de validação.
+
+### Retorno acumulado da estratégia
+
+![Retorno acumulado da estratégia](results/figures/BKT_cumulative_return.png)
+
+Leitura breve: o FactorVAE termina o período com a maior curva acumulada do grupo, claramente acima do EW Market e de todos os demais modelos. A vantagem se acentua a partir de 2022, quando os modelos lineares e o momentum passam a perder terreno de forma sistemática.
+
+### Retorno acumulado em excesso vs benchmark
+
+![Retorno acumulado em excesso vs benchmark](results/figures/BKT_cumulative_excess_return.png)
+
+Leitura breve: contra o benchmark igual-ponderado, o FactorVAE acumula cerca de +45 p.p. de log-excesso ao final da amostra, com trajetória crescente. Todos os demais modelos encerram o período com excesso negativo, Momentum sendo o mais penalizado (−45 p.p.).
+
+### Rank IC rolling de 60 dias
+
+![Rank IC rolling](results/figures/RIC_rolling_rank_ic.png)
+
+Leitura breve: o Rank IC do FactorVAE é consistentemente o maior do grupo em praticamente toda a janela de teste, com excepção do choque de março de 2020. O diferencial sobre o GRU existe, mas é pequeno; a distância para Momentum e modelos lineares é clara a partir de 2022.
+
+## 4. Tabelas comparativas
+
+Os arquivos PNG de comparação estão em `results/figures/`. As mesmas informações são apresentadas abaixo em Markdown.
+
+### Qualidade do sinal preditivo
+
+| Modelo | Rank IC | Rank ICIR |
+|---|---:|---:|
+| **FactorVAE** | **+0,040** | **+0,246** |
+| GRU | +0,025 | +0,217 |
+| Linear (Ridge) | +0,022 | +0,177 |
+| MLP | +0,021 | +0,177 |
+| Momentum | +0,011 | +0,074 |
+
+### Performance ajustada ao risco (Rf = 10% a.a.)
+
+| Modelo | Ret. Anual | Retorno Exc. | Volatil. | Sharpe | IR | Calmar | Max DD |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| **FactorVAE** | **+14,11%** | **+4,62%** | +19,82% | **+0,207** | **+0,479** | **+0,347** | +40,70% |
+| EW Market | +9,49% | +0,00% | +25,99% | −0,020 | +0,000 | +0,181 | +52,55% |
+| GRU | +6,09% | −3,39% | +22,77% | −0,172 | −0,439 | +0,111 | +54,72% |
+| Linear (Ridge) | +6,03% | −3,46% | +23,27% | −0,171 | −0,430 | +0,131 | +45,92% |
+| MLP | +5,85% | −3,63% | +23,02% | −0,180 | −0,476 | +0,111 | +52,73% |
+| Momentum | +2,79% | −6,70% | +24,49% | −0,295 | −0,643 | +0,044 | +63,98% |
+
+### Métricas operacionais da estratégia
+
+| Modelo | Hit Rate | Turnover |
+|---|---:|---:|
+| Momentum | +53,36% | +12,78% |
+| **FactorVAE** | **+52,64%** | **+14,58%** |
+| GRU | +52,80% | +33,86% |
+| MLP | +52,75% | +34,07% |
+| Linear (Ridge) | +51,53% | +35,25% |
+
+Interpretação breve: o FactorVAE combina hit rate acima de 50% com o menor turnover entre os modelos neurais (14,6%), o que amplifica a vantagem líquida de custos frente a GRU, MLP e Ridge.
+
+## 5. Como reproduzir
+
+### Instalação
+
+```bash
+pip install -e .
+```
+
+### Pipeline principal
+
+```bash
+# 1. Construir base processada
+python scripts/build_features.py
+
+# 2. Treinar o modelo
+python scripts/train.py
+
+# 3. Gerar previsões e avaliar o FactorVAE
+python scripts/evaluate.py
+
+# 4. Rodar benchmarks
+python benchmarks/run_benchmarks.py
+
+# 5. Regenerar figuras e tabelas comparativas
+python scripts/backtest.py
+```
+
+### Testes
+
+```bash
+pytest tests/ -q
+```
+
+## 6. Estrutura do repositório
+
+```text
+FactorVAE/
+├── config.yaml
+├── README.md
+├── benchmarks/
+├── data/
+├── results/
+│   ├── checkpoints/
+│   ├── predictions/
+│   └── figures/
+├── scripts/
+├── src/factorvae/
+└── tests/
+```
+
+## Referência
+
+Duan, S., Zhang, K., Wang, G., & Liu, Q. (2022). FactorVAE: A Probabilistic Dynamic Factor Model Based on Variational Autoencoder for Predicting Cross-Sectional Stock Returns. *Proceedings of the AAAI Conference on Artificial Intelligence*, 36(4), 4468–4476.
 
 ## Conteudo
 

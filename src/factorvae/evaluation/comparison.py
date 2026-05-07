@@ -94,6 +94,7 @@ def build_comparison_table(
     k: int = 50,
     n: int = 5,
     eta: float = 0.0,
+    risk_free_rate: float = 0.10,
 ) -> pd.DataFrame:
     """
     Run TopK-Drop for each prediction source and build a comparative metrics table.
@@ -116,7 +117,8 @@ def build_comparison_table(
         port      = topk_drop_strategy(preds, k=k, n=n, eta=eta)
         port_ret  = port.set_index("date")["portfolio_return"]
         turnover  = port.set_index("date")["turnover"]
-        perf = compute_performance_metrics(port_ret, benchmark_returns, turnover=turnover)
+        perf = compute_performance_metrics(port_ret, benchmark_returns, turnover=turnover,
+                                           risk_free_rate=risk_free_rate)
         rows.append({"model": name, **ic, **perf})
 
     return pd.DataFrame(rows).set_index("model")

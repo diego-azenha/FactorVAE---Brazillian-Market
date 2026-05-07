@@ -43,6 +43,7 @@ from factorvae.evaluation.metrics import compute_rank_ic
 from factorvae.models.factorvae import FactorVAE
 from factorvae.training.lightning_module import FactorVAELightning
 from factorvae.utils.seeding import seed_everything
+from factorvae.utils.checkpoints import resolve_checkpoint
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -137,6 +138,7 @@ def main() -> None:
     parser.add_argument("--n-estimators",  type=int, default=500)
     parser.add_argument("--seed",          type=int, default=42)
     args = parser.parse_args()
+    args.checkpoint = resolve_checkpoint(args.checkpoint)
 
     with open(args.config) as f:
         config = yaml.safe_load(f)
