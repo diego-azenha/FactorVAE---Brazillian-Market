@@ -15,7 +15,7 @@ def topk_drop_strategy(
     k: int,
     n: int,
     eta: float = 0.0,
-    fee_rate: float = 0.001,
+    fee_rate: float = 0.0025,
 ) -> pd.DataFrame:
     """
     TopK-Drop strategy.
@@ -50,14 +50,19 @@ def topk_drop_strategy(
         # Rank by score descending
         day = day.sort_values("score", ascending=False)
 
-        # TopK-Drop: keep existing holdings that are still in top-(k + n) candidates,
-        # then fill to k with the highest-scoring newcomers.
-        top_candidates = set(day.head(k + n)["ticker"])
-        retained = current_portfolio & top_candidates
-        needed = k - len(retained)
-        candidates_sorted = day[~day["ticker"].isin(retained)]["ticker"].tolist()
-        new_stocks = set(candidates_sorted[:needed])
-        new_portfolio = retained | new_stocks
+        # TopK-Drop: retain existing holdings that still rank in the universe,
+        # but cap additions at n per day (hard turnover constraint).
+        # Step 1: force-retain the best k-n holdings from the current portfolio
+        #         (those ranked highest among current stocks today).
+        if current_portfolio:
+            held_today = day[day["ticker"].isin(current_portfolio)]
+            force_keep = set(held_today.head(k - n)["ticker"])  # top k-n existing
+        else:
+            force_keep = set()
+        # Step 2: from remaining universe (excluding forced keeps), pick top n newcomers
+        remaining = day[~day["ticker"].isin(force_keep)]
+        new_picks = set(remaining.head(n)["ticker"])
+        new_portfolio = force_keep | new_picks
 
         # Turnover: fraction of portfolio changed
         if current_portfolio:
@@ -106,20 +111,30 @@ def compute_performance_metrics(
     port  = portfolio_returns.values
     excess = port - bench
 
-    # Use nanmean/nanstd so that dates with no valid y_true (e.g. last 2 days
-    # of the dataset where forward return is undefined) don't propagate NaN
-    # through all downstream metrics.
+    # Use nan-safe operations so that dates with no valid y_true (e.g. last 2 days
+    # of the dataset where forward return is undefined) don't propagate NaN.
     days = 252
-    ann_return = float(np.nanmean(port) * days)
-    ann_excess = float(np.nanmean(excess) * days)
+
+    # CAGR (geometric annualised return) — consistent with cumulative wealth plots.
+    # Arithmetic mean × 252 overstates performance for high-volatility strategies.
+    valid_port  = port[~np.isnan(port)]
+    n_port      = len(valid_port)
+    cum_wealth  = float(np.prod(1.0 + valid_port))
+    ann_return  = float(cum_wealth ** (days / n_port) - 1.0) if n_port > 0 else 0.0
+
+    valid_bench = bench[~np.isnan(bench)]
+    n_bench     = len(valid_bench)
+    cum_bm      = float(np.prod(1.0 + valid_bench))
+    ann_bm      = float(cum_bm ** (days / n_bench) - 1.0) if n_bench > 0 else 0.0
+    ann_excess  = ann_return - ann_bm
+
     vol = float(np.nanstd(port, ddof=1) * np.sqrt(days))
 
     excess_vol = float(np.nanstd(excess, ddof=1) * np.sqrt(days))
     sharpe     = (ann_return - risk_free_rate) / vol if vol > 1e-9 else 0.0
     info_ratio = ann_excess / excess_vol if excess_vol > 1e-9 else 0.0
 
-    valid = port[~np.isnan(port)]
-    cum_port    = np.cumprod(1.0 + valid)
+    cum_port    = np.cumprod(1.0 + valid_port)
     running_max = np.maximum.accumulate(cum_port)
     drawdown    = (running_max - cum_port) / running_max
     mdd = float(drawdown.max()) if len(drawdown) > 0 else 0.0
@@ -128,7 +143,8 @@ def compute_performance_metrics(
     hit_rate = float(np.nanmean(port > 0))
 
     out = {
-        "annualized_return":  ann_return,
+        "annualized_return":   ann_return,
+        "cumulative_return":   float(cum_wealth - 1.0),
         "annualized_excess":  ann_excess,
         "volatility":         vol,
         "sharpe":             sharpe,

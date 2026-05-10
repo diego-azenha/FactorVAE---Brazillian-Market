@@ -18,6 +18,8 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
+from torch.cuda.amp import autocast
+from tqdm import tqdm
 
 from factorvae.data.dataset import RealDataset
 from factorvae.evaluation.metrics import compute_rank_ic
@@ -53,6 +55,7 @@ def _val_rank_ic(model: SimpleGRU, val_ds: RealDataset) -> float:
 def train_and_predict(
     config: dict,
     hidden: int = 20,
+    exclude_tickers: list | None = None,
 ) -> pd.DataFrame:
     """
     Train GRU with early stopping on val Rank IC; predict on test split.
@@ -89,15 +92,25 @@ def train_and_predict(
     best_state    = copy.deepcopy(model.state_dict())
     epochs_no_imp = 0
 
-    for epoch in range(max_epochs):
+    excl_set = set(exclude_tickers) if exclude_tickers else set()
+    for epoch in tqdm(range(max_epochs), desc="  GRU", unit="epoch", leave=True):
         model.train()
         total_loss = 0.0
         indices    = np.random.permutation(len(train_ds))
         for idx in indices:
             sample = train_ds[idx]
             x, y   = sample[0], sample[-2]
+            if excl_set:
+                date_ts    = train_ds.trading_dates[idx]
+                tickers_at = train_ds.universe_by_date[date_ts]
+                keep = [i for i, t in enumerate(tickers_at) if t not in excl_set]
+                if not keep:
+                    continue
+                keep_t = torch.tensor(keep, dtype=torch.long)
+                x, y = x[keep_t], y[keep_t]
             optimizer.zero_grad()
-            loss = criterion(model(x), y)
+            with autocast():
+                loss = criterion(model(x), y)
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
@@ -105,9 +118,9 @@ def train_and_predict(
         val_ic   = _val_rank_ic(model, val_ds)
         improved = val_ic > best_val_ic
         marker   = " *" if improved else ""
-        print(f"    epoch {epoch + 1:3d}/{max_epochs}  "
-              f"train_loss={total_loss / len(train_ds):.4f}  "
-              f"val_rank_ic={val_ic:+.4f}{marker}")
+        tqdm.write(f"    epoch {epoch + 1:3d}/{max_epochs}  "
+                   f"train_loss={total_loss / len(train_ds):.4f}  "
+                   f"val_rank_ic={val_ic:+.4f}{marker}")
 
         if improved:
             best_val_ic = val_ic
@@ -116,15 +129,15 @@ def train_and_predict(
         else:
             epochs_no_imp += 1
             if epochs_no_imp >= patience:
-                print(f"    Early stopping at epoch {epoch + 1} "
-                      f"(no improvement for {patience} epochs)")
+                tqdm.write(f"    Early stopping at epoch {epoch + 1} "
+                          f"(no improvement for {patience} epochs)")
                 break
 
     # Load best checkpoint (same as FactorVAE using ModelCheckpoint)
     model.load_state_dict(best_state)
-    print(f"  GRU: best val Rank IC = {best_val_ic:+.4f}")
+    tqdm.write(f"  GRU: best val Rank IC = {best_val_ic:+.4f}")
 
-    print(f"  GRU: prevendo em {len(test_ds)} datas…")
+    tqdm.write(f"  GRU: prevendo em {len(test_ds)} datas…")
     model.eval()
     raw_returns = (
         pd.read_parquet(Path(dc["processed_dir"]) / "returns.parquet")
@@ -152,4 +165,5 @@ def train_and_predict(
                     "sigma_pred": 0.0,
                     "y_true":     y_true,
                 })
-    return pd.DataFrame(records)
+    predictions_df = pd.DataFrame(records)
+    return predictions_df

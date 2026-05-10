@@ -27,11 +27,10 @@ def load_all_predictions(root: Path) -> dict[str, pd.DataFrame]:
     Missing files are silently skipped.
     """
     sources = {
-        "FactorVAE":      root / "results" / "predictions" / "predictions.parquet",
-        "Momentum":       root / "benchmarks" / "predictions" / "momentum_predictions.parquet",
-        "Linear (Ridge)": root / "benchmarks" / "predictions" / "linear_predictions.parquet",
-        "MLP":            root / "benchmarks" / "predictions" / "mlp_predictions.parquet",
-        "GRU":            root / "benchmarks" / "predictions" / "gru_predictions.parquet",
+        "FactorVAE": root / "results"    / "predictions" / "predictions.parquet",
+        "GRU":       root / "benchmarks" / "predictions" / "gru_predictions.parquet",
+        "IPCA":      root / "benchmarks" / "predictions" / "ipca_predictions.parquet",
+        "CA":        root / "benchmarks" / "predictions" / "ca_predictions.parquet",
     }
     out: dict[str, pd.DataFrame] = {}
     for name, path in sources.items():
@@ -73,14 +72,34 @@ def load_benchmark(path: Path, predictions: pd.DataFrame) -> pd.Series:
     """
     Load benchmark return series.
 
-    If *path* exists, reads a parquet with columns [date, return].
-    Otherwise falls back to equal-weight cross-section average of y_true
-    (labeled "EW Market" in output).
+    Tries sources in order:
+    1. Ibovespa (data/processed/ibov_returns.parquet) if exists
+    2. Custom benchmark path if provided and exists
+    3. Falls back to equal-weight cross-section average
+
+    Args:
+        path : Path to optional benchmark parquet [date, return]
+        predictions : Predictions DF to extract date range
+
+    Returns:
+        Series indexed by date with benchmark returns
     """
-    if path.exists():
+    from pathlib import Path as PathlibPath
+    
+    # Try Ibovespa first
+    ibov_path = PathlibPath(__file__).resolve().parents[3] / "data" / "processed" / "ibov_returns.parquet"
+    if ibov_path.exists():
+        df = pd.read_parquet(ibov_path)
+        df["date"] = pd.to_datetime(df["date"])
+        return df.set_index("date")["return"].rename("Ibovespa")
+    
+    # Try custom path
+    if path and path.exists():
         df = pd.read_parquet(path)
         df["date"] = pd.to_datetime(df["date"])
         return df.set_index("date")["return"]
+    
+    # Fallback to equal-weight
     predictions = predictions.copy()
     predictions["date"] = pd.to_datetime(predictions["date"])
     return predictions.groupby("date")["y_true"].mean().rename("EW Market")
@@ -134,7 +153,7 @@ def format_for_display(df: pd.DataFrame) -> pd.DataFrame:
     float cols: rank_ic, sharpe, etc.                → "+0.123"
     """
     pct_cols = [
-        "annualized_return", "annualized_excess", "volatility",
+        "annualized_return", "cumulative_return", "annualized_excess", "volatility",
         "max_drawdown", "hit_rate", "avg_turnover",
     ]
     flt_cols = ["rank_ic", "rank_icir", "sharpe", "information_ratio", "calmar"]

@@ -28,6 +28,7 @@ import yaml
 from factorvae.evaluation.backtest  import compute_performance_metrics, topk_drop_strategy
 from factorvae.evaluation.comparison import (
     build_comparison_table,
+    compute_ic_summary,
     format_for_display,
     load_all_predictions,
     load_benchmark,
@@ -51,11 +52,11 @@ def _date_axis(ax: plt.Axes) -> None:
 
 
 COLOR_MAP = {
-    "FactorVAE":      PALETTE[0],      # brand red
-    "Momentum":       "#003f88",       # deep navy
-    "Linear (Ridge)": "#1a6eb5",       # medium blue
-    "MLP":            "#5b9fd4",       # light blue
-    "GRU":            "#9ec5e8",       # pale blue
+    "FactorVAE":           "#E8192E",  # bright red
+    "FactorVAE (TDrisk)": "#8B0000",  # dark burgundy — risk-adjusted variant
+    "GRU":                "#003f88",  # deep navy   — temporal baseline
+    "IPCA":               "#1a6eb5",  # medium blue — linear factor model
+    "CA":                 "#5b9fd4",  # light blue  — non-linear factor model
 }
 
 
@@ -100,6 +101,22 @@ def run_backtest_from_predictions(
     rf = config.get("evaluation", {}).get("risk_free_rate", 0.10)
     table = build_comparison_table(root, benchmark, k=k, n=n, eta=0.0, risk_free_rate=rf)
 
+    # ── Add TDrisk row for FactorVAE when eta > 0 (Experiment 3) ─────────────
+    if eta > 0.0 and "FactorVAE" in all_preds:
+        _fv_preds    = all_preds["FactorVAE"]
+        _port_td     = topk_drop_strategy(_fv_preds, k=k, n=n, eta=eta)
+        _port_td_ret = _port_td.set_index("date")["portfolio_return"]
+        _turn_td     = _port_td.set_index("date")["turnover"]
+        _perf_td     = compute_performance_metrics(
+            _port_td_ret, benchmark, turnover=_turn_td, risk_free_rate=rf
+        )
+        _tdrisk_row = pd.DataFrame(
+            {**{"rank_ic": float("nan"), "rank_icir": float("nan")}, **_perf_td},
+            index=["FactorVAE (TDrisk)"],
+        )
+        _fv_idx = list(table.index).index("FactorVAE") + 1 if "FactorVAE" in table.index else len(table)
+        table = pd.concat([table.iloc[:_fv_idx], _tdrisk_row, table.iloc[_fv_idx:]])
+
     fig_dir = out_dir if out_dir is not None else root / "results" / "figures"
     fig_dir.mkdir(parents=True, exist_ok=True)
 
@@ -110,16 +127,22 @@ def run_backtest_from_predictions(
     print(f"\nTable saved → {csv_path.relative_to(root)}")
 
     # ── Render three styled comparison table PNGs ─────────────────────────────
-    # Add EW Market row to performance table (buy-and-hold baseline)
-    _ew_turn  = pd.Series(0.0, index=benchmark.index)
-    _ew_perf  = compute_performance_metrics(benchmark, benchmark, turnover=_ew_turn,
-                                             risk_free_rate=rf)
+    # Add benchmark row to performance table (buy-and-hold baseline).
+    # Restrict benchmark to the test period (dates present in the predictions)
+    # so its cumulative return is comparable to the model portfolios.
+    _test_dates   = sorted(factorvaepreds["date"].unique())
+    _bm_test      = benchmark.reindex(_test_dates).fillna(0.0)
+    _ew_turn      = pd.Series(0.0, index=_bm_test.index)
+    _ew_perf      = compute_performance_metrics(_bm_test, _bm_test, turnover=_ew_turn,
+                                               risk_free_rate=rf)
     _ew_row   = pd.DataFrame(
         {**{"rank_ic": float("nan"), "rank_icir": float("nan")}, **_ew_perf},
-        index=["EW Market"],
+        index=[benchmark.name],
     )
-    _fv_pos   = (list(table.index).index("FactorVAE") + 1
-                 if "FactorVAE" in table.index else len(table))
+    # Place EW Market after all FactorVAE variants (including TDrisk)
+    _fv_names = [n for n in table.index if n.startswith("FactorVAE")]
+    _fv_pos   = (max(list(table.index).index(n) for n in _fv_names) + 1
+                 if _fv_names else len(table))
     perf_table = pd.concat([table.iloc[:_fv_pos], _ew_row, table.iloc[_fv_pos:]])
 
     formatted      = format_for_display(table)
@@ -128,11 +151,12 @@ def run_backtest_from_predictions(
     _PRETTY = {
         "rank_ic":            "Rank IC",
         "rank_icir":          "Rank ICIR",
-        "annualized_return":  "Ret. Anual",
+        "annualized_return":  "CAGR",
         "annualized_excess":  "Retorno Exc.",
         "volatility":         "Volatil.",
         "sharpe":             "Sharpe",
         "information_ratio":  "IR",
+        "cumulative_return":  "Ret. Acum.",
         "calmar":             "Calmar",
         "max_drawdown":       "Max DD",
         "hit_rate":           "Hit Rate",
@@ -145,12 +169,15 @@ def run_backtest_from_predictions(
         return src[present].rename(columns=_PRETTY)
 
     _IC    = ["rank_ic", "rank_icir"]
-    _PERF  = ["annualized_return", "volatility",
-               "sharpe", "information_ratio", "calmar", "max_drawdown"]
+    _PERF  = ["annualized_return", "cumulative_return", "volatility",
+               "sharpe", "information_ratio", "max_drawdown"]
     _STRAT = ["hit_rate", "avg_turnover"]
 
+    # Rank IC: exclude TDrisk (same signal as FactorVAE, only portfolio construction differs)
+    ic_table = _sub(_IC)
+    ic_table = ic_table[~ic_table.index.str.contains("TDrisk", na=False)]
     render_comparison_table(
-        _sub(_IC),
+        ic_table,
         out_path=fig_dir / "RIC_comparison_ic.png",
         title="Qualidade do sinal preditivo",
         subtitle="Rank IC e Rank ICIR médios · período de teste",
@@ -158,11 +185,13 @@ def run_backtest_from_predictions(
     )
     print("Figure saved → results/figures/RIC_comparison_ic.png")
 
+    _strategy_label = "TopK-Drop / TDrisk" if eta > 0.0 else "TopK-Drop"
+    _eta_note       = f" · η={eta:.1f} (TDrisk)" if eta > 0.0 else ""
     render_comparison_table(
         _sub(_PERF, formatted_perf),
         out_path=fig_dir / "BKT_comparison_performance.png",
-        title="Performance ajustada ao risco — TopK-Drop",
-        subtitle=f"k={k} ações, n={n}/dia, taxa 10 bps · período de teste",
+        title=f"Performance ajustada ao risco — {_strategy_label}",
+        subtitle=f"k={k} ações, n={n}/dia, taxa 25 bps{_eta_note} · período de teste",
         figsize=(11, 5.0),
     )
     print("Figure saved → results/figures/BKT_comparison_performance.png")
@@ -197,6 +226,11 @@ def run_backtest_from_predictions(
         port = topk_drop_strategy(preds, k=k, n=n, eta=0.0).set_index("date")
         port_series[name] = port["portfolio_return"]
 
+    # TDrisk: FactorVAE with risk-adjusted scoring (Experiment 3)
+    if eta > 0.0 and "FactorVAE" in all_preds:
+        _port_td_s = topk_drop_strategy(all_preds["FactorVAE"], k=k, n=n, eta=eta).set_index("date")
+        port_series["FactorVAE (TDrisk)"] = _port_td_s["portfolio_return"]
+
     all_dates = sorted({d for r in port_series.values() for d in r.index})
     bm_aligned = benchmark.reindex(all_dates).fillna(0.0)
     label_bm = benchmark.name if hasattr(benchmark, "name") and benchmark.name else "Benchmark"
@@ -226,7 +260,7 @@ def run_backtest_from_predictions(
     ax1.set_ylabel("Retorno acumulado (base 1, escala log)")
     ax1.set_title(
         f"Retorno acumulado — estratégia TopK-Drop\n"
-        f"k={k} ações, turnover máx. n={n}/dia, taxa 10 bps · universo B3",
+        f"k={k} ações, turnover máx. n={n}/dia, taxa 25 bps · universo B3",
         fontsize=12, fontweight="bold", loc="left", pad=8,
     )
     ax1.legend(frameon=False, fontsize=9)

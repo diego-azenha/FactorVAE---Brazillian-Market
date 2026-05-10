@@ -1,9 +1,10 @@
 """
 Generate prediction files for all benchmark models.
 
-Run once immediately after build_features.py. Predictions are deterministic
-(Momentum has no random init; Ridge has no random init), so they never need
-to be regenerated unless the processed data or config splits change.
+Benchmarks (in narrative order):
+  GRU  — temporal model, no factor structure (same features as FactorVAE)
+  IPCA — latent-factor model with linear conditional loadings (fundamentals)
+  CA   — latent-factor model with non-linear conditional loadings (fundamentals)
 
 Usage:
     python benchmarks/run_benchmarks.py
@@ -15,8 +16,6 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-# Ensure the project root is on sys.path so `benchmarks.*` and `factorvae.*` are importable
-# regardless of the working directory from which this script is invoked.
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -30,41 +29,32 @@ def main() -> None:
     out_dir = ROOT / "benchmarks" / "predictions"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Import here so the module-level ROOT in each benchmark resolves correctly
-    from benchmarks.momentum     import generate_predictions as momentum_predict
-    from benchmarks.linear_model import train_and_predict    as linear_predict
-    from benchmarks.mlp          import train_and_predict    as mlp_predict
-    from benchmarks.gru          import train_and_predict    as gru_predict
+    from benchmarks.gru  import train_and_predict  as gru_predict
+    from benchmarks.ipca import train_and_predict  as ipca_predict
+    from benchmarks.ca   import train_and_predict  as ca_predict
 
-    print("─" * 60)
-    print("Running Momentum benchmark…")
-    mom = momentum_predict(config)
-    out = out_dir / "momentum_predictions.parquet"
-    mom.to_parquet(out, index=False)
-    print(f"  Saved {len(mom):,} rows → {out.relative_to(ROOT)}")
-
-    print()
-    print("Running Ridge Linear benchmark…")
-    lin = linear_predict(config, alpha=1.0)
-    out = out_dir / "linear_predictions.parquet"
-    lin.to_parquet(out, index=False)
-    print(f"  Saved {len(lin):,} rows → {out.relative_to(ROOT)}")
-
-    print()
-    print("Running MLP benchmark…")
-    mlp_df = mlp_predict(config)
-    out = out_dir / "mlp_predictions.parquet"
-    mlp_df.to_parquet(out, index=False)
-    print(f"  Saved {len(mlp_df):,} rows → {out.relative_to(ROOT)}")
-
-    print()
+    print("-" * 60)
     print("Running GRU benchmark…")
     gru_df = gru_predict(config)
     out = out_dir / "gru_predictions.parquet"
     gru_df.to_parquet(out, index=False)
     print(f"  Saved {len(gru_df):,} rows → {out.relative_to(ROOT)}")
 
-    print("─" * 60)
+    print()
+    print("Running IPCA benchmark…")
+    ipca_df = ipca_predict(config, K=3)
+    out = out_dir / "ipca_predictions.parquet"
+    ipca_df.to_parquet(out, index=False)
+    print(f"  Saved {len(ipca_df):,} rows → {out.relative_to(ROOT)}")
+
+    print()
+    print("Running CA benchmark…")
+    ca_df = ca_predict(config, K=3)
+    out = out_dir / "ca_predictions.parquet"
+    ca_df.to_parquet(out, index=False)
+    print(f"  Saved {len(ca_df):,} rows → {out.relative_to(ROOT)}")
+
+    print("-" * 60)
     print("Done. Re-run only if processed data or config splits change.")
 
 
