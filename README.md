@@ -1,310 +1,186 @@
-# FactorVAE - Mercado Brasileiro (B3)
+# FactorVAE no mercado brasileiro (B3)
 
-Implementação do FactorVAE aplicada a ações da B3, com foco em previsão cross-sectional de retornos e avaliação econômica via estratégia TopK-Drop.
+Este documento resume e interpreta os resultados do run:
 
-O projeto compara o FactorVAE com benchmarks simples e neurais sobre o período de teste de 2019-01-01 a 2026-03-26 (universo de 471 ativos). O resultado principal: o modelo entrega retorno anualizado de **+14,1%**, excesso de **+4,6% a.a.** sobre o benchmark igual-ponderado, e é o único modelo com Sharpe positivo (taxa livre de risco de 10% a.a.) no período.
+- `results/runs/20260510_000234_97ad920d`
+- recorte principal: `results/runs/20260510_000234_97ad920d/full_universe`
 
-## Conteúdo
+Todos os números abaixo vêm dos artefatos desse run (principalmente `comparison_table.csv` e os PNGs comparativos).
 
-1. Visão geral
-2. Principais resultados
-3. Figuras
-4. Tabelas comparativas
-5. Como reproduzir
-6. Estrutura do repositório
+## 1. Objetivo do experimento
 
-## 1. Visão geral
+O objetivo aqui nao e apenas medir acuracia estatistica, mas avaliar se o sinal preditivo converte em resultado economico em uma carteira com friccao.
 
-O FactorVAE combina:
+Setup usado no run (conforme os titulos dos graficos):
 
-- extrator temporal com GRU para resumir o histórico recente de cada ativo;
-- fatores latentes probabilísticos para modelar o estado do mercado;
-- decoder fatorial para mapear fatores em retornos previstos por ativo;
-- avaliação econômica em carteira, não apenas métricas estatísticas.
+- Estrategia: TopK-Drop.
+- Universo: B3 (full universe).
+- Carteira: `k=50` acoes.
+- Restricao de giro: `n=5` trocas por dia.
+- Custo: `25 bps`.
+- Variantes avaliadas: FactorVAE, FactorVAE (TDrisk), GRU, IPCA, CA, com Ibovespa como referencia visual de mercado.
 
-O backtest usa uma estratégia TopK-Drop com:
+## 2. Leitura executiva
 
-- `k = 50` ações em carteira;
-- `n = 5` substituições máximas por dia;
-- custo de transação de `10 bps` (one-way);
-- benchmark `EW Market` sobre o mesmo universo;
-- Sharpe calculado com taxa livre de risco de **10% a.a.**.
+Resultado em uma frase: o FactorVAE foi o melhor entre os modelos do experimento em qualidade de sinal e em retorno acumulado da estrategia, mas nao superou o Ibovespa em CAGR no periodo.
 
-## 2. Principais resultados
+Interpretacao objetiva:
 
-- O FactorVAE foi o único modelo com Sharpe positivo (+0,207), retorno anualizado de +14,1% e excesso de +4,6% sobre o EW Market — todos os demais modelos ficaram abaixo do benchmark depois de custos.
-- O sinal do modelo foi o melhor em Rank IC médio (+0,040) e Rank ICIR (+0,246), contra o segundo lugar GRU (+0,025 / +0,217).
-- Hit rate de 52,6% com turnover médio de apenas 14,6% — o menor turnover de qualquer modelo neural, o que favorece a performance líquida de custos.
-- Entre os benchmarks, o GRU foi o competidor mais próximo em qualidade de sinal, mas ainda entregou retorno de apenas +6,1% a.a. com Sharpe negativo (-0,172).
-- Momentum e Ridge ficaram claramente atrás tanto em qualidade de sinal quanto em performance de carteira.
+- O modelo lidera em qualidade de ordenacao cross-section (Rank IC e Rank ICIR).
+- Essa vantagem estatistica foi convertida em melhor curva acumulada entre os modelos comparados no CSV.
+- O perfil de risco e mais contido que o Ibovespa (menor volatilidade e menor max drawdown), mas com retorno anualizado um pouco menor.
+- A versao TDrisk melhora o controle operacional (menor turnover), porem com custo de retorno.
 
-## 3. Figuras
+## 3. Qualidade do sinal preditivo
 
-### Diagnóstico de treino
-
-![Diagnóstico de treino](results/figures/TRAIN_training_curves.png)
-
-Leitura breve: a perda total e a componente de reconstrução caem de forma gradual, enquanto o Rank IC de validação permanece positivo e crescente ao longo do treino. O comportamento sugere aprendizado estável, com melhora consistente fora da amostra de validação.
-
-### Retorno acumulado da estratégia
-
-![Retorno acumulado da estratégia](results/figures/BKT_cumulative_return.png)
-
-Leitura breve: o FactorVAE termina o período com a maior curva acumulada do grupo, claramente acima do EW Market e de todos os demais modelos. A vantagem se acentua a partir de 2022, quando os modelos lineares e o momentum passam a perder terreno de forma sistemática.
-
-### Retorno acumulado em excesso vs benchmark
-
-![Retorno acumulado em excesso vs benchmark](results/figures/BKT_cumulative_excess_return.png)
-
-Leitura breve: contra o benchmark igual-ponderado, o FactorVAE acumula cerca de +45 p.p. de log-excesso ao final da amostra, com trajetória crescente. Todos os demais modelos encerram o período com excesso negativo, Momentum sendo o mais penalizado (−45 p.p.).
-
-### Rank IC rolling de 60 dias
-
-![Rank IC rolling](results/figures/RIC_rolling_rank_ic.png)
-
-Leitura breve: o Rank IC do FactorVAE é consistentemente o maior do grupo em praticamente toda a janela de teste, com excepção do choque de março de 2020. O diferencial sobre o GRU existe, mas é pequeno; a distância para Momentum e modelos lineares é clara a partir de 2022.
-
-## 4. Tabelas comparativas
-
-Os arquivos PNG de comparação estão em `results/figures/`. As mesmas informações são apresentadas abaixo em Markdown.
-
-### Qualidade do sinal preditivo
+Fonte: `comparison_table.csv` e `RIC_comparison_ic.png`.
 
 | Modelo | Rank IC | Rank ICIR |
 |---|---:|---:|
-| **FactorVAE** | **+0,040** | **+0,246** |
-| GRU | +0,025 | +0,217 |
-| Linear (Ridge) | +0,022 | +0,177 |
-| MLP | +0,021 | +0,177 |
-| Momentum | +0,011 | +0,074 |
+| **FactorVAE** | **+0.040** | **+0.246** |
+| GRU | +0.025 | +0.217 |
+| IPCA | +0.016 | +0.113 |
+| CA | +0.035 | +0.219 |
 
-### Performance ajustada ao risco (Rf = 10% a.a.)
+Interpretacao:
 
-| Modelo | Ret. Anual | Retorno Exc. | Volatil. | Sharpe | IR | Calmar | Max DD |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| **FactorVAE** | **+14,11%** | **+4,62%** | +19,82% | **+0,207** | **+0,479** | **+0,347** | +40,70% |
-| EW Market | +9,49% | +0,00% | +25,99% | −0,020 | +0,000 | +0,181 | +52,55% |
-| GRU | +6,09% | −3,39% | +22,77% | −0,172 | −0,439 | +0,111 | +54,72% |
-| Linear (Ridge) | +6,03% | −3,46% | +23,27% | −0,171 | −0,430 | +0,131 | +45,92% |
-| MLP | +5,85% | −3,63% | +23,02% | −0,180 | −0,476 | +0,111 | +52,73% |
-| Momentum | +2,79% | −6,70% | +24,49% | −0,295 | −0,643 | +0,044 | +63,98% |
+- O FactorVAE tem a melhor capacidade media de ranquear ativos e tambem a melhor estabilidade desse sinal (ICIR).
+- O CA aparece como concorrente forte em ICIR, mas ainda abaixo do FactorVAE.
+- O gap para IPCA e relevante tanto em nivel de IC quanto em consistencia, sugerindo menor poder de discriminacao desse baseline.
 
-### Métricas operacionais da estratégia
+Leitura economica:
+
+- Em estrategias long-only TopK, um ganho pequeno e persistente de Rank IC tende a acumular bastante no horizonte longo.
+- Este run segue exatamente esse padrao: a lideranca em sinal aparece refletida na curva de retorno acumulado da estrategia.
+
+## 4. Performance ajustada ao risco
+
+Fonte: `comparison_table.csv` e `BKT_comparison_performance.png`.
+
+| Modelo | CAGR | Ret. Acum. | Volatil. | Sharpe | IR | Max DD |
+|---|---:|---:|---:|---:|---:|---:|
+| **FactorVAE** | **+9.97%** | **+97.05%** | **+19.72%** | **-0.002** | **-0.028** | **+41.24%** |
+| FactorVAE (TDrisk) | +8.54% | +79.49% | +20.28% | -0.072 | -0.076 | +43.33% |
+| Ibovespa | +10.78% | +107.92% | +23.49% | +0.033 | +0.000 | +46.82% |
+| GRU | +6.69% | +58.73% | +21.96% | -0.151 | -0.133 | +48.29% |
+| IPCA | -2.23% | -14.89% | +27.24% | -0.449 | -0.382 | +58.10% |
+| CA | +6.72% | +59.10% | +20.54% | -0.160 | -0.135 | +44.93% |
+
+Interpretacao:
+
+- Entre os modelos do experimento, o FactorVAE entrega a melhor combinacao de retorno acumulado e risco.
+- Frente ao Ibovespa, o trade-off e claro: menor risco (vol e drawdown menores), mas retorno anualizado tambem menor.
+- O Sharpe do FactorVAE fica praticamente neutro (-0.002), o que indica que o retorno anualizado ficou muito proximo da taxa de referencia usada no calculo.
+- A versao TDrisk reduz retorno sem melhorar drawdown de forma material neste run especifico.
+
+Ponto importante de interpretacao:
+
+- Nao e correto concluir "FactorVAE domina tudo". O que os dados mostram e:
+- Lideranca robusta versus GRU/IPCA/CA dentro do conjunto de modelos testado.
+- Competicao equilibrada com o benchmark de mercado (Ibovespa), com vantagem de risco para o modelo e vantagem de retorno para o indice no periodo observado.
+
+## 5. Metricas operacionais da estrategia
+
+Fonte: `comparison_table.csv` e `BKT_comparison_strategy.png`.
 
 | Modelo | Hit Rate | Turnover |
 |---|---:|---:|
-| Momentum | +53,36% | +12,78% |
-| **FactorVAE** | **+52,64%** | **+14,58%** |
-| GRU | +52,80% | +33,86% |
-| MLP | +52,75% | +34,07% |
-| Linear (Ridge) | +51,53% | +35,25% |
+| FactorVAE | +52.03% | +10.04% |
+| FactorVAE (TDrisk) | +52.75% | +8.17% |
+| GRU | +52.69% | +10.05% |
+| IPCA | +51.19% | +10.05% |
+| CA | +52.86% | +10.05% |
 
-Interpretação breve: o FactorVAE combina hit rate acima de 50% com o menor turnover entre os modelos neurais (14,6%), o que amplifica a vantagem líquida de custos frente a GRU, MLP e Ridge.
+Interpretacao:
 
-## 5. Como reproduzir
+- Os hit rates sao proximos (faixa de ~51% a ~53%), entao a diferenca de performance nao vem apenas de "acertar mais dias".
+- O diferencial aparece na qualidade do ranking e na trajetoria de acumulacao ao longo do tempo.
+- O TDrisk e o mais eficiente em giro (8.17%), mas sacrificou retorno acumulado de forma visivel.
 
-### Instalação
+Implicacao pratica:
+
+- Para uma mesa que prioriza menor rotacao operacional, TDrisk pode ser interessante.
+- Para objetivo de retorno total no periodo desse run, o FactorVAE padrao foi superior.
+
+## 6. Leitura dos graficos
+
+### 6.1 Retorno acumulado da estrategia
+
+![Retorno acumulado](results/runs/20260510_000234_97ad920d/full_universe/BKT_cumulative_return.png)
+
+- O FactorVAE termina acima dos demais modelos do CSV.
+- O Ibovespa fecha o periodo em nivel acumulado superior ao FactorVAE.
+- O IPCA se descola negativamente no trecho final da amostra.
+
+### 6.2 Retorno acumulado em excesso vs benchmark
+
+![Retorno em excesso](results/runs/20260510_000234_97ad920d/full_universe/BKT_cumulative_excess_return.png)
+
+- O excesso do FactorVAE oscila em torno de zero no fim da amostra.
+- Em relacao aos baselines de modelo, a curva do FactorVAE permanece mais resiliente.
+- O IPCA mostra deterioracao acentuada e persistente.
+
+### 6.3 Qualidade de sinal (IC e ICIR)
+
+![Qualidade do sinal](results/runs/20260510_000234_97ad920d/full_universe/RIC_comparison_ic.png)
+
+- O topo da tabela confirma o ganho de sinal do FactorVAE.
+- A diferenca para CA/GRU existe, mas e incremental, nao ordens de grandeza.
+
+### 6.4 Tabelas visuais do run
+
+![Performance ajustada ao risco](results/runs/20260510_000234_97ad920d/full_universe/BKT_comparison_performance.png)
+
+![Metricas da estrategia](results/runs/20260510_000234_97ad920d/full_universe/BKT_comparison_strategy.png)
+
+## 7. Conclusoes do run (sem extrapolacao)
+
+1. O FactorVAE foi o melhor modelo dentro do conjunto testado em sinal e retorno acumulado da estrategia.
+2. O Ibovespa teve CAGR maior no periodo, apesar de maior risco (volatilidade e drawdown superiores).
+3. O TDrisk melhorou giro, mas nao melhorou o resultado final de retorno neste recorte.
+4. O ganho do FactorVAE parece vir mais da qualidade e consistencia de ranking do que de diferencas grandes de hit rate.
+
+## 8. Limites de inferencia
+
+- Este README descreve um run especifico (20260510_000234_97ad920d).
+- Conclusoes nao devem ser generalizadas automaticamente para outros periodos/regimes sem validacao adicional.
+- Custos, restricoes de giro e composicao de universo impactam materialmente o resultado.
+
+## 9. Estrutura dos artefatos do run
+
+```text
+results/runs/20260510_000234_97ad920d/
+├── run_info.json
+├── full_universe/
+│   ├── comparison_table.csv
+│   ├── BKT_comparison_performance.png
+│   ├── BKT_comparison_strategy.png
+│   ├── BKT_cumulative_excess_return.png
+│   ├── BKT_cumulative_return.png
+│   ├── RIC_comparison_ic.png
+│   └── RIC_rolling_rank_ic.png
+├── predictions/
+├── robustness_missing/
+└── figures/
+```
+
+## 10. Reproducao
 
 ```bash
 pip install -e .
-```
-
-### Pipeline principal
-
-```bash
-# 1. Construir base processada
 python scripts/build_features.py
-
-# 2. Treinar o modelo
 python scripts/train.py
-
-# 3. Gerar previsões e avaliar o FactorVAE
 python scripts/evaluate.py
-
-# 4. Rodar benchmarks
 python benchmarks/run_benchmarks.py
-
-# 5. Regenerar figuras e tabelas comparativas
 python scripts/backtest.py
 ```
 
-### Testes
+Testes:
 
 ```bash
 pytest tests/ -q
 ```
 
-## 6. Estrutura do repositório
-
-```text
-FactorVAE/
-├── config.yaml
-├── README.md
-├── benchmarks/
-├── data/
-├── results/
-│   ├── checkpoints/
-│   ├── predictions/
-│   └── figures/
-├── scripts/
-├── src/factorvae/
-└── tests/
-```
-
-## Referência
-
-Duan, S., Zhang, K., Wang, G., & Liu, Q. (2022). FactorVAE: A Probabilistic Dynamic Factor Model Based on Variational Autoencoder for Predicting Cross-Sectional Stock Returns. *Proceedings of the AAAI Conference on Artificial Intelligence*, 36(4), 4468–4476.
-
-## Conteudo
-
-1. Visao geral
-2. Principais resultados
-3. Figuras
-4. Tabelas comparativas
-5. Como reproduzir
-6. Estrutura do repositorio
-
-## 1. Visao geral
-
-O FactorVAE combina:
-
-- extrator temporal com GRU para resumir o historico recente de cada ativo;
-- fatores latentes probabilisticos para modelar o estado do mercado;
-- decoder fatorial para mapear fatores em retornos previstos por ativo;
-- avaliacao economica em carteira, nao apenas metricas estatisticas.
-
-O backtest usa uma estrategia TopK-Drop com:
-
-- `k = 50` acoes em carteira;
-- `n = 5` substituicoes maximas por dia;
-- custo de transacao de `10 bps`;
-- benchmark `EW Market` sobre o mesmo universo.
-
-## 2. Principais resultados
-
-- O FactorVAE foi o melhor modelo em retorno anualizado, com `10.95%` ao ano, levemente abaixo do `EW Market` em retorno em excesso anualizado (`-0.05%`), mas acima de todos os outros sinais alternativos.
-- O sinal do modelo foi o melhor em Rank IC medio (`0.020`) e empatou a melhor leitura de Rank ICIR (`0.118`).
-- A estrategia teve o maior hit rate do conjunto (`50.09%`), mas sem exigir o maior turnover. O turnover medio foi `18.07%`, abaixo de GRU, MLP e Ridge.
-- Entre os benchmarks, o GRU foi o competidor mais forte. Ele ficou mais proximo do benchmark em retorno e teve Rank ICIR igual ao do FactorVAE, mas ainda perdeu em retorno final e em hit rate.
-- Momentum e Ridge ficaram claramente atras, tanto em retorno acumulado quanto em desempenho ajustado ao risco.
-
-## 3. Figuras
-
-### Diagnostico de treino
-
-![Diagnostico de treino](results/figures/TRAIN_training_curves.png)
-
-Leitura breve: a perda total e a componente de reconstrucao caem de forma gradual, enquanto o Rank IC de validacao permanece positivo na maior parte do treino. O comportamento sugere aprendizado estavel, sem deterioracao clara fora da amostra de validacao.
-
-### Retorno acumulado da estrategia
-
-![Retorno acumulado da estrategia](results/figures/BKT_cumulative_return.png)
-
-Leitura breve: o FactorVAE termina o periodo com a maior curva acumulada do grupo, acima do `EW Market` e tambem acima do GRU. A vantagem aparece principalmente do fim de 2023 em diante, quando os modelos lineares e o momentum ficam mais para tras.
-
-### Retorno acumulado em excesso vs benchmark
-
-![Retorno acumulado em excesso vs benchmark](results/figures/BKT_cumulative_excess_return.png)
-
-Leitura breve: contra o benchmark igual-ponderado, o FactorVAE oscila em torno de zero no fim da amostra, mas continua muito acima dos demais benchmarks, que encerram o periodo com excesso acumulado bem negativo. Em outras palavras: o modelo nao gera um alfa folgado contra o benchmark depois de custos, mas ainda domina os sinais alternativos.
-
-### Rank IC rolling de 60 dias
-
-![Rank IC rolling](results/figures/RIC_rolling_rank_ic.png)
-
-Leitura breve: o Rank IC do FactorVAE e positivo em boa parte da amostra, mas sem superioridade estatica e limpa em todas as janelas. O diferencial do modelo parece vir menos de um IC muito acima do resto em todo instante e mais da combinacao entre sinal competitivo, melhor conversao em carteira e menor degradacao economica que os benchmarks piores.
-
-## 4. Tabelas comparativas
-
-Os arquivos PNG de comparacao continuam em `results/figures`, mas abaixo as mesmas informacoes sao apresentadas em Markdown.
-
-### Qualidade do sinal preditivo
-
-| Modelo | Rank IC | Rank ICIR |
-|-------|-------:|----------:|
-| FactorVAE | +0.020 | +0.118 |
-| Momentum | +0.006 | +0.037 |
-| Linear (Ridge) | +0.005 | +0.037 |
-| MLP | +0.010 | +0.071 |
-| GRU | +0.016 | +0.118 |
-
-Interpretacao breve: o FactorVAE lidera em Rank IC e divide a melhor leitura de Rank ICIR com o GRU. O ganho do modelo nao vem de um salto gigantesco na correlacao media, e sim de uma melhora consistente sobre os modelos mais simples e de uma traducao melhor desse sinal para performance de carteira.
-
-### Performance ajustada ao risco
-
-| Modelo | Ret. Anual | Retorno Exc. | Volatil. | Sharpe | IR | Calmar | Max DD |
-|-------|-----------:|-------------:|---------:|-------:|---:|-------:|-------:|
-| FactorVAE | +10.95% | -0.05% | +22.79% | -0.007 | -0.007 | -0.003 | +18.72% |
-| EW Market | +11.01% | +0.00% | +26.52% | +0.000 | +0.000 | +0.000 | +0.00% |
-| Momentum | +6.37% | -4.63% | +24.59% | -0.596 | -0.596 | -0.121 | +38.33% |
-| Linear (Ridge) | +4.30% | -6.71% | +27.11% | -1.102 | -1.102 | -0.167 | +40.15% |
-| MLP | +7.80% | -3.20% | +26.80% | -0.544 | -0.544 | -0.123 | +26.08% |
-| GRU | +9.49% | -1.52% | +24.64% | -0.268 | -0.268 | -0.085 | +17.95% |
-
-Interpretacao breve: o FactorVAE foi o melhor modelo entre os sinais concorrentes em retorno anualizado e tambem um dos melhores em controle de drawdown. O ponto que limita a leitura economica e que, frente ao `EW Market`, o retorno em excesso anualizado ficou praticamente nulo. Ainda assim, contra os benchmarks de modelagem, ele foi claramente superior.
-
-### Metricas operacionais da estrategia
-
-| Modelo | Hit Rate | Turnover |
-|-------|---------:|---------:|
-| FactorVAE | +50.09% | +18.07% |
-| Momentum | +48.65% | +9.29% |
-| Linear (Ridge) | +45.55% | +32.81% |
-| MLP | +47.45% | +31.16% |
-| GRU | +48.19% | +25.10% |
-
-Interpretacao breve: o FactorVAE foi o unico modelo acima de 50% de hit rate e nao exigiu o turnover extremo de Ridge, MLP ou mesmo GRU. Isso ajuda a explicar por que um ganho moderado em qualidade de sinal se converteu em melhor resultado final de carteira.
-
-## 5. Como reproduzir
-
-### Instalacao
-
-```bash
-pip install -e .
-```
-
-### Pipeline principal
-
-```bash
-# 1. Construir base processada
-python scripts/build_features.py
-
-# 2. Treinar o modelo
-python scripts/train.py
-
-# 3. Gerar predicoes e avaliar o FactorVAE
-python scripts/evaluate.py
-
-# 4. Rodar benchmarks
-python benchmarks/run_benchmarks.py
-
-# 5. Regenerar figuras e tabelas comparativas
-python scripts/backtest.py
-```
-
-### Testes
-
-```bash
-pytest tests/ -q
-```
-
-## 6. Estrutura do repositorio
-
-```text
-FactorVAE/
-|-- config.yaml
-|-- README.md
-|-- benchmarks/
-|-- data/
-|-- results/
-|   |-- checkpoints/
-|   |-- predictions/
-|   `-- figures/
-|-- scripts/
-|-- src/factorvae/
-`-- tests/
-```
-
-## Referencia
+## 11. Referencia
 
 Duan, S., Zhang, K., Wang, G., & Liu, Q. (2022). FactorVAE: A Probabilistic Dynamic Factor Model Based on Variational Autoencoder for Predicting Cross-Sectional Stock Returns. Proceedings of the AAAI Conference on Artificial Intelligence, 36(4), 4468-4476.
