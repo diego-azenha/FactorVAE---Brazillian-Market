@@ -3,16 +3,14 @@ Evaluate FactorVAE on the test set.
 
 Loads the best checkpoint, runs forward_predict on every test date,
 saves results/predictions/predictions.parquet, then automatically runs:
-  - Robustness test (fractional stock-drop, 5 trials)
   - Full backtest + comparison table vs benchmark models
-  - Three figures saved to results/figures/
+  - Figures saved to the run directory
 
 Usage:
     python scripts/evaluate.py
     python scripts/evaluate.py --checkpoint results/checkpoints/best.ckpt
     python scripts/evaluate.py --synthetic
     python scripts/evaluate.py --skip-backtest
-    python scripts/evaluate.py --skip-robustness
 """
 
 from __future__ import annotations
@@ -38,7 +36,6 @@ from factorvae.data.datamodule import FactorVAEDataModule
 from factorvae.models.factorvae import FactorVAE
 from factorvae.training.lightning_module import FactorVAELightning
 from factorvae.evaluation.metrics import compute_rank_ic, compute_rank_icir
-from factorvae.evaluation.robustness import robustness_drop_test
 from factorvae.utils.seeding import seed_everything
 from factorvae.utils.checkpoints import resolve_checkpoint
 
@@ -59,11 +56,6 @@ def main() -> None:
         "--skip-backtest",
         action="store_true",
         help="Skip backtest and comparison table (inference + IC only).",
-    )
-    parser.add_argument(
-        "--skip-robustness",
-        action="store_true",
-        help="Skip the robustness drop test.",
     )
     args = parser.parse_args()
     args.checkpoint = resolve_checkpoint(args.checkpoint)
@@ -177,19 +169,6 @@ def main() -> None:
 
     print(f"Test Rank IC:   {sum(rank_ics)/len(rank_ics):.4f}")
     print(f"Test Rank ICIR: {compute_rank_icir(rank_ics):.4f}")
-
-    # ── Robustness test ───────────────────────────────────────────────────────
-    if not args.synthetic and not args.skip_robustness:
-        print("\n── Robustness test (15% stock drop, 5 trials) ──────────────────────")
-        out_df_parsed = out_df.copy()
-        out_df_parsed["date"] = pd.to_datetime(out_df_parsed["date"])
-        rob = robustness_drop_test(out_df_parsed, drop_frac=0.15, n_trials=5)
-        print(f"  Full-universe Rank IC : {rob['rank_ic_full']:+.4f}")
-        print(f"  Drop-{rob['drop_frac']*100:.0f}% mean Rank IC : {rob['rank_ic_mean']:+.4f} "
-              f"± {rob['rank_ic_std']:.4f}  (n_trials={rob['n_trials']})")
-        print(f"  Avg stocks per date   : {rob['avg_n_full']:.1f} full → "
-              f"{rob['avg_n_dropped']:.1f} after drop")
-        print("────────────────────────────────────────────────────────────────────")
 
     # ── Backtest + comparison ─────────────────────────────────────────────────
     if not args.synthetic and not args.skip_backtest:

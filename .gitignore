@@ -25,6 +25,10 @@ data/processed/
 results/predictions/
 results/runs/**/*.parquet
 
+# Training artefacts
+lightning_logs/
+out.txt
+
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb

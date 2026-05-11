@@ -150,7 +150,7 @@ def train_and_predict(
     K               : number of latent factors
     max_iter        : maximum ALS iterations
     tol             : ALS convergence threshold (max |ΔΓ|)
-    exclude_tickers : tickers to withhold from training (for robustness tests)
+    exclude_tickers : tickers to withhold from training
 
     Returns
     -------

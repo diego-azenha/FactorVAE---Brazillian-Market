@@ -28,7 +28,7 @@ from scipy.stats import norm
 
 from factorvae.evaluation.plot_style import (
     PALETTE, TEXT_PRIMARY, TEXT_SECONDARY,
-    add_brand_bar, add_footer, add_title, apply_style,
+    add_footer, add_title, apply_style,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -201,7 +201,6 @@ def main() -> None:
         ncol=2,
     )
 
-    add_brand_bar(fig, y=1.0 - 0.5 / fig_h)
     add_title(
         fig,
         "Prior vs Posterior ao longo do treino",

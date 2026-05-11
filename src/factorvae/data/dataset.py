@@ -115,7 +115,6 @@ class RealDataset(Dataset):
         exclude_tickers: list[str] | None = None,
     ):
         processed_dir = Path(processed_dir)
-        # Tickers to exclude from this dataset (used for holdout-retrain robustness test)
         _exclude: set[str] = set(exclude_tickers) if exclude_tickers else set()
 
         # ── Load parquets ────────────────────────────────────────────────

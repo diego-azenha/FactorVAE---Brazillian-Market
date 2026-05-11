@@ -109,7 +109,7 @@ def train_and_predict(
     config          : parsed config.yaml dict
     K               : number of latent factors
     hidden          : hidden units in BetaNet (CA1 = 32)
-    exclude_tickers : tickers to withhold from training (for robustness tests)
+    exclude_tickers : tickers to withhold from training
 
     Returns
     -------

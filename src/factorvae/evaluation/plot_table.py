@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from factorvae.evaluation.plot_style import (
-    BRAND_RED, TEXT_PRIMARY, TEXT_SECONDARY, BG_COLOR,
-    apply_style, add_title, add_footer, add_brand_bar,
+    TEXT_PRIMARY, TEXT_SECONDARY,
+    apply_style, add_title, add_footer,
 )
 
 
@@ -61,8 +61,8 @@ def render_comparison_table(
     for i, (model_name, row) in enumerate(df.iterrows()):
         y          = y_header - (i + 1) * row_h
         highlight  = (model_name == highlight_row)
-        row_color  = BRAND_RED if highlight else TEXT_PRIMARY
-        row_weight = "bold" if highlight else "normal"
+        row_color  = TEXT_PRIMARY
+        row_weight = "semibold" if highlight else "normal"
 
         ax.text(model_x, y, str(model_name), fontweight=row_weight,
                 fontsize=10, color=row_color, va="center", ha="left",
@@ -75,7 +75,6 @@ def render_comparison_table(
         ax.axhline(y - row_h * 0.5, color="#E5E5E5", linewidth=0.4,
                    xmin=0.01, xmax=0.99)
 
-    add_brand_bar(fig)
     add_title(fig, title, subtitle=subtitle)
     add_footer(fig, source=source)
     fig.savefig(out_path)

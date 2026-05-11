@@ -24,8 +24,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from factorvae.evaluation.plot_style import (
-    PALETTE, TEXT_SECONDARY,
-    add_brand_bar, add_footer, add_title, apply_style, finalize_axes,
+    apply_style,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -81,66 +80,54 @@ def main() -> None:
     val   = val.set_index("epoch").sort_index()
 
     apply_style()
-    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
-    fig.subplots_adjust(top=0.83, bottom=0.08, left=0.07, right=0.93, hspace=0.32, wspace=0.28)
+    fig, axes = plt.subplots(2, 2, figsize=(10, 7))
 
     # [0,0] Total training loss
-    axes[0, 0].plot(train.index, train["train_loss"], "-",
-                    color=PALETTE[0])
-    axes[0, 0].set_title("Perda total")
-    axes[0, 0].set_xlabel("Época")
+    axes[0, 0].plot(train.index, train["train_loss"], lw=0.9)
+    axes[0, 0].set_title("Total Loss")
+    axes[0, 0].set_xlabel("Epoch")
     axes[0, 0].set_ylabel("Loss")
-    finalize_axes(axes[0, 0], y_right=False)
+    axes[0, 0].margins(x=0)
+    axes[0, 0].grid()
 
     # [0,1] Reconstruction loss with marginal reference
     if "train_loss_recon" in train.columns:
-        axes[0, 1].plot(
-            train.index, train["train_loss_recon"], "-", color=PALETTE[1]
-        )
-        axes[0, 1].axhline(
-            _NLL_FLOOR,
-            color=TEXT_SECONDARY,
-            linestyle="--",
-            linewidth=0.8,
-            label=f"N(0,1) marginal ({_NLL_FLOOR:.3f})",
-        )
-        axes[0, 1].legend(fontsize=8)
+        axes[0, 1].plot(train.index, train["train_loss_recon"], lw=0.9)
+        _NLL_FLOOR = 0.5 * (1.0 + 1.8378770664)
+        axes[0, 1].axhline(_NLL_FLOOR, color="black", linestyle="--", lw=0.8, label=f"N(0,1) marginal ({_NLL_FLOOR:.3f})")
+        axes[0, 1].legend(loc="upper right")
     else:
         axes[0, 1].text(0.5, 0.5, "train_loss_recon\nnot logged",
                         ha="center", va="center", transform=axes[0, 1].transAxes)
-    axes[0, 1].set_title("Reconstrução (NLL)")
-    axes[0, 1].set_xlabel("Época")
+    axes[0, 1].set_title("Reconstruction (NLL)")
+    axes[0, 1].set_xlabel("Epoch")
     axes[0, 1].set_ylabel("Loss")
-    finalize_axes(axes[0, 1], y_right=False)
+    axes[0, 1].margins(x=0)
+    axes[0, 1].grid()
 
     # [1,0] KL divergence
     if "train_loss_kl" in train.columns:
-        axes[1, 0].plot(
-            train.index, train["train_loss_kl"], "-", color=PALETTE[2]
-        )
+        axes[1, 0].plot(train.index, train["train_loss_kl"], lw=0.9)
     else:
         axes[1, 0].text(0.5, 0.5, "train_loss_kl\nnot logged",
                         ha="center", va="center", transform=axes[1, 0].transAxes)
-    axes[1, 0].set_title("Divergência KL")
-    axes[1, 0].set_xlabel("Época")
+    axes[1, 0].set_title("KL Divergence")
+    axes[1, 0].set_xlabel("Epoch")
     axes[1, 0].set_ylabel("Loss")
-    finalize_axes(axes[1, 0], y_right=False)
+    axes[1, 0].margins(x=0)
+    axes[1, 0].grid()
 
     # [1,1] Validation Rank IC
-    axes[1, 1].plot(
-        val.index, val["val_rank_ic"], "-", color=PALETTE[3]
-    )
-    axes[1, 1].axhline(0, color=TEXT_SECONDARY, linestyle="--", linewidth=0.5)
-    axes[1, 1].set_title("Rank IC (validação)")
-    axes[1, 1].set_xlabel("Época")
+    axes[1, 1].plot(val.index, val["val_rank_ic"], lw=0.9)
+    axes[1, 1].axhline(0, color="black", linestyle="--", lw=0.8)
+    axes[1, 1].set_title("Validation Rank IC")
+    axes[1, 1].set_xlabel("Epoch")
     axes[1, 1].set_ylabel("Rank IC")
-    finalize_axes(axes[1, 1], y_right=False)
+    axes[1, 1].margins(x=0)
+    axes[1, 1].grid()
 
-    add_brand_bar(fig)
-    add_title(fig, "Diagnóstico de treino",
-              subtitle="Perda total, componente de reconstrução e KL, Rank IC de validação",
-              y_title=0.945, y_sub=0.895)
-    add_footer(fig, source="Lightning logs. Cálculos do autor")
+    fig.suptitle("Training Diagnostics")
+    fig.tight_layout()
 
     out = ROOT / "results" / "figures" / "TRAIN_training_curves.png"
     out.parent.mkdir(parents=True, exist_ok=True)

@@ -3,7 +3,7 @@
 Este documento resume e interpreta os resultados do run:
 
 - `results/runs/20260510_000234_97ad920d`
-- recorte principal: `results/runs/20260510_000234_97ad920d/full_universe`
+- recorte principal: `results/figures`
 
 Todos os números abaixo vêm dos artefatos desse run (principalmente `comparison_table.csv` e os PNGs comparativos).
 
@@ -106,7 +106,7 @@ Implicacao pratica:
 
 ### 6.1 Retorno acumulado da estrategia
 
-![Retorno acumulado](results/runs/20260510_000234_97ad920d/full_universe/BKT_cumulative_return.png)
+![Retorno acumulado](results/figures/BKT_cumulative_return.png)
 
 - O FactorVAE termina acima dos demais modelos do CSV.
 - O Ibovespa fecha o periodo em nivel acumulado superior ao FactorVAE.
@@ -114,7 +114,7 @@ Implicacao pratica:
 
 ### 6.2 Retorno acumulado em excesso vs benchmark
 
-![Retorno em excesso](results/runs/20260510_000234_97ad920d/full_universe/BKT_cumulative_excess_return.png)
+![Retorno em excesso](results/figures/BKT_cumulative_excess_return.png)
 
 - O excesso do FactorVAE oscila em torno de zero no fim da amostra.
 - Em relacao aos baselines de modelo, a curva do FactorVAE permanece mais resiliente.
@@ -122,16 +122,16 @@ Implicacao pratica:
 
 ### 6.3 Qualidade de sinal (IC e ICIR)
 
-![Qualidade do sinal](results/runs/20260510_000234_97ad920d/full_universe/RIC_comparison_ic.png)
+![Qualidade do sinal](results/figures/RIC_comparison_ic.png)
 
 - O topo da tabela confirma o ganho de sinal do FactorVAE.
 - A diferenca para CA/GRU existe, mas e incremental, nao ordens de grandeza.
 
 ### 6.4 Tabelas visuais do run
 
-![Performance ajustada ao risco](results/runs/20260510_000234_97ad920d/full_universe/BKT_comparison_performance.png)
+![Performance ajustada ao risco](results/figures/BKT_comparison_performance.png)
 
-![Metricas da estrategia](results/runs/20260510_000234_97ad920d/full_universe/BKT_comparison_strategy.png)
+![Metricas da estrategia](results/figures/BKT_comparison_strategy.png)
 
 ## 7. Conclusoes do run (sem extrapolacao)
 
@@ -151,17 +151,14 @@ Implicacao pratica:
 ```text
 results/runs/20260510_000234_97ad920d/
 ├── run_info.json
-├── full_universe/
-│   ├── comparison_table.csv
-│   ├── BKT_comparison_performance.png
-│   ├── BKT_comparison_strategy.png
-│   ├── BKT_cumulative_excess_return.png
-│   ├── BKT_cumulative_return.png
-│   ├── RIC_comparison_ic.png
-│   └── RIC_rolling_rank_ic.png
-├── predictions/
-├── robustness_missing/
-└── figures/
+└── full_universe/
+    ├── comparison_table.csv
+    ├── BKT_comparison_performance.png
+    ├── BKT_comparison_strategy.png
+    ├── BKT_cumulative_excess_return.png
+    ├── BKT_cumulative_return.png
+    ├── RIC_comparison_ic.png
+    └── RIC_rolling_rank_ic.png
 ```
 
 ## 10. Reproducao
@@ -170,9 +167,8 @@ results/runs/20260510_000234_97ad920d/
 pip install -e .
 python scripts/build_features.py
 python scripts/train.py
-python scripts/evaluate.py
-python benchmarks/run_benchmarks.py
-python scripts/backtest.py
+python scripts/evaluate.py          # gera predictions + backtest do FactorVAE
+python scripts/run_experiments.py   # treina benchmarks e gera todas as figuras comparativas
 ```
 
 Testes:
